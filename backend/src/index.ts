@@ -2,7 +2,8 @@ import express from 'express';
 import dotenv from 'dotenv';
 import pool from './db';
 import authRoutes from './routes/auth.routes';
-import mealRoutes from './routes/meal.routes'; // Import meal routes
+import mealRoutes from './routes/meal.routes';
+import rankingRoutes from './routes/ranking.routes'; // Import ranking routes
 import cors from 'cors';
 
 dotenv.config();
@@ -25,7 +26,8 @@ pool.connect()
 
 // API Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/meals', mealRoutes); // Mount meal routes
+app.use('/api/meals', mealRoutes);
+app.use('/api/rankings', rankingRoutes); // Mount ranking routes
 
 app.get('/', (req, res) => {
   res.send('Cooked Backend API is running!');
