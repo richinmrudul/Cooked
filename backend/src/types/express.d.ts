@@ -1,9 +1,15 @@
 import { JwtPayload } from 'jsonwebtoken';
+import { Request } from 'express'; // Import Request to extend it directly
 
-declare global { // Added 'declare global' for more explicit global augmentation
-  namespace Express {
-    interface Request {
-      user?: JwtPayload;
-    }
+// Define your custom JWT payload structure
+interface CustomJwtPayload extends JwtPayload {
+  id: string;
+  email: string;
+}
+
+// Augment the existing Request interface directly
+declare module 'express-serve-static-core' {
+  interface Request {
+    user?: CustomJwtPayload; // Use your custom payload type
   }
 }
