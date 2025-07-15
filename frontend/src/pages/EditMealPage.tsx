@@ -2,16 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useApiClient } from '../api/apiClient';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 
-// Add Ingredient type definition (must match backend's expected structure for sending)
+// Updated Ingredient type definition - Removed macro fields
 interface IngredientFormData {
-  id?: string; // ID will exist for existing ingredients
+  id?: string;
   name: string;
   quantity: string;
   unit: string;
-  calories?: string;
-  protein?: string;
-  carbs?: string;
-  fat?: string;
 }
 
 const EditMealPage: React.FC = () => {
@@ -23,10 +19,9 @@ const EditMealPage: React.FC = () => {
     description: '',
     date_made: '',
     photo_url: '',
-    overall_rating: 3,
+    overall_rating: 3, // Still in state for consistency, but not editable directly
     tags: '',
   });
-  // New state for ingredients
   const [ingredients, setIngredients] = useState<IngredientFormData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,25 +43,21 @@ const EditMealPage: React.FC = () => {
           overall_rating: data.overall_rating || 3,
           tags: data.tags ? data.tags.join(', ') : '',
         });
-        // Populate ingredients from fetched data
         if (data.ingredients && data.ingredients.length > 0) {
             setIngredients(data.ingredients.map((ing: any) => ({
                 id: ing.id,
                 name: ing.name,
                 quantity: String(ing.quantity),
                 unit: ing.unit || '',
-                calories: ing.calories ? String(ing.calories) : '',
-                protein: ing.protein ? String(ing.protein) : '',
-                carbs: ing.carbs ? String(ing.carbs) : '',
-                fat: ing.fat ? String(ing.fat) : '',
+                // Macro fields are no longer collected by frontend, but will be preserved by backend if existed
             })));
         } else {
-            setIngredients([{ name: '', quantity: '', unit: '' }]); // Start with one empty if none exist
+            setIngredients([{ name: '', quantity: '', unit: '' }]);
         }
       } catch (err: any) {
         setError(err.message || 'Failed to fetch meal for editing.');
         console.error('Error fetching meal for edit:', err);
-        navigate('/meals'); // Redirect if meal not found or error
+        navigate('/meals');
       } finally {
         setLoading(false);
       }
@@ -80,11 +71,10 @@ const EditMealPage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handlers for dynamic ingredient fields
   const handleIngredientChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const newIngredients = [...ingredients];
-    (newIngredients[index] as any)[name] = value; // Type assertion needed for dynamic property
+    (newIngredients[index] as any)[name] = value;
     setIngredients(newIngredients);
   };
 
@@ -104,18 +94,16 @@ const EditMealPage: React.FC = () => {
 
     const mealData = {
       ...formData,
-      overall_rating: Number(formData.overall_rating),
+      overall_rating: Number(formData.overall_rating), // This value will be sent back, but not from an input
       tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      // Prepare ingredients for backend: convert quantity/macros to numbers
+      // Only send name, quantity, unit for ingredients
       ingredients: ingredients.map(ing => ({
         name: ing.name.trim(),
         quantity: Number(ing.quantity) || 0,
         unit: ing.unit.trim(),
-        calories: ing.calories ? Number(ing.calories) : undefined,
-        protein: ing.protein ? Number(ing.protein) : undefined,
-        carbs: ing.carbs ? Number(ing.carbs) : undefined,
-        fat: ing.fat ? Number(ing.fat) : undefined,
-      })).filter(ing => ing.name && ing.quantity > 0) // Filter out empty or zero-quantity ingredients
+        // Macro fields are no longer collected by frontend, so they are omitted here.
+        // Backend will default them to null if not provided, or keep existing if they were there via the UPDATE query's ON CONFLICT.
+      })).filter(ing => ing.name && ing.quantity > 0)
     };
 
     try {
@@ -124,7 +112,7 @@ const EditMealPage: React.FC = () => {
         body: JSON.stringify(mealData),
       });
       alert('Meal updated successfully!');
-      navigate('/meals'); // Navigate back to meals list
+      navigate('/meals');
     } catch (err: any) {
       setError(err.message || 'Failed to update meal.');
       console.error('Error updating meal:', err);
@@ -145,7 +133,6 @@ const EditMealPage: React.FC = () => {
     <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
       <h2>Edit Meal</h2>
       <form onSubmit={handleSubmit}>
-        {/* Existing fields for title, description, date_made, photo_url, overall_rating, tags */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Title:</label>
           <input type="text" name="title" value={formData.title} onChange={handleChange} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
@@ -162,18 +149,14 @@ const EditMealPage: React.FC = () => {
           <label style={{ display: 'block', marginBottom: '5px' }}>Photo URL:</label>
           <input type="url" name="photo_url" value={formData.photo_url} onChange={handleChange} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Overall Rating (1-5):</label>
-          <input type="number" name="overall_rating" value={formData.overall_rating} onChange={handleChange} min="1" max="5" required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
-        </div>
+        {/* REMOVED: Overall Rating input field */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Tags (comma-separated):</label>
           <input type="text" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
         </div>
 
-        {/* NEW: Ingredients Section */}
         <h3 style={{ marginTop: '30px', marginBottom: '15px' }}>Ingredients</h3>
-        {ingredients.length === 0 && !loading && ( // Show "Add first ingredient" if empty
+        {ingredients.length === 0 && !loading && (
           <p style={{ textAlign: 'center', color: '#777', marginBottom: '15px' }}>Click "Add Ingredient" to add your first ingredient.</p>
         )}
         {ingredients.map((ingredient, index) => (
@@ -214,57 +197,8 @@ const EditMealPage: React.FC = () => {
                 />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Calories:</label>
-                    <input
-                        type="number"
-                        name="calories"
-                        value={ingredient.calories || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="kcal"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Protein:</label>
-                    <input
-                        type="number"
-                        name="protein"
-                        value={ingredient.protein || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="g"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Carbs:</label>
-                    <input
-                        type="number"
-                        name="carbs"
-                        value={ingredient.carbs || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="g"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Fat:</label>
-                    <input
-                        type="number"
-                        name="fat"
-                        value={ingredient.fat || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="g"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-            </div>
-            {ingredients.length > 0 && ( // Allow removing even if only one ingredient exists
+            {/* REMOVED: Calories, Protein, Carbs, Fat fields */}
+            {ingredients.length > 0 && (
               <button type="button" onClick={() => handleRemoveIngredient(index)} style={{ padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8em', marginTop: '10px' }}>
                 Remove Ingredient
               </button>

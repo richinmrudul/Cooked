@@ -69,7 +69,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       setToken(data.token);
       setUser(data.user);
-      navigate('/dashboard'); // Navigate to a dashboard or home page after login
+      navigate('/meals'); // Navigate to a meals or home page after login
     } finally {
       setLoading(false);
     }

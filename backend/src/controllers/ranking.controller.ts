@@ -14,6 +14,8 @@ const setMealRank = async (req: Request, res: Response) => {
   }
 
   try {
+    await pool.query('BEGIN'); // Start transaction
+
     // First, check if the meal belongs to the user
     const mealCheck: QueryResult = await pool.query(
       'SELECT id FROM meals WHERE id = $1 AND user_id = $2',
@@ -21,28 +23,16 @@ const setMealRank = async (req: Request, res: Response) => {
     );
 
     if (mealCheck.rowCount === 0) {
+      await pool.query('ROLLBACK'); // Rollback if meal not found
       return res.status(404).json({ message: 'Meal not found or not authorized for this user.' });
     }
 
-    // Use a transaction for atomic operations
-    await pool.query('BEGIN');
+    // --- REMOVED THE OLD DELETE BLOCK HERE ---
+    // The previous code block that checked existingRank and deleted based on rank_position
+    // is now removed, as the database constraint no longer exists and
+    // ON CONFLICT (user_id, meal_id) handles updates for existing meals.
 
-    // Check if another meal already occupies this rank for the user
-    const existingRank: QueryResult = await pool.query(
-      'SELECT meal_id FROM rankings WHERE user_id = $1 AND rank_position = $2',
-      [userId, rankPosition]
-    );
-
-    // FIX: Add null check for existingRank before accessing rowCount
-    if (existingRank && (existingRank.rowCount as number) > 0) {
-      // Option 1: Remove the old meal from this rank
-      await pool.query(
-        'DELETE FROM rankings WHERE user_id = $1 AND rank_position = $2',
-        [userId, rankPosition]
-      );
-    }
-
-    // Insert or update the new rank
+    // Insert or update the meal's rank. ON CONFLICT handles if this meal is already ranked by the user.
     const result: QueryResult = await pool.query(
       `INSERT INTO rankings (user_id, meal_id, rank_position)
        VALUES ($1, $2, $3)
@@ -51,16 +41,15 @@ const setMealRank = async (req: Request, res: Response) => {
       [userId, mealId, rankPosition]
     );
 
-    await pool.query('COMMIT');
+    await pool.query('COMMIT'); // Commit transaction
     res.status(200).json({ message: 'Meal rank updated successfully', ranking: result.rows[0] });
 
-  } catch (error: unknown) { // Add error: unknown type here as well
+  } catch (error: unknown) {
     await pool.query('ROLLBACK'); // Rollback on error
     console.error('Error setting meal rank:', error);
 
-    // Optional: More detailed error handling for specific PostgreSQL errors if needed
     if (typeof error === 'object' && error !== null && 'code' in error && typeof (error as any).code === 'string') {
-        if ((error as any).code === '23503') { // Foreign key violation (e.g., mealId doesn't exist)
+        if ((error as any).code === '23503') {
             return res.status(400).json({ message: 'Invalid meal ID or rank position.' });
         }
     }
@@ -71,33 +60,44 @@ const setMealRank = async (req: Request, res: Response) => {
 
 const getRankedMeals = async (req: Request, res: Response) => {
   const userId = req.user?.id;
+  const { mealId } = req.query;
 
   if (!userId) {
     return res.status(401).json({ message: 'User not authenticated.' });
   }
 
   try {
-    const result: QueryResult = await pool.query(
-      `SELECT
-          r.rank_position, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made,
-          ARRAY_AGG(mt.tag_name) FILTER (WHERE mt.tag_name IS NOT NULL) AS tags
-       FROM rankings r
-       JOIN meals m ON r.meal_id = m.id
-       LEFT JOIN meal_tags mt ON m.id = mt.meal_id
-       WHERE r.user_id = $1
-       GROUP BY r.rank_position, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made
-       ORDER BY r.rank_position ASC`,
-      [userId]
-    );
+    let queryText = `
+        SELECT
+            r.rank_position, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made,
+            ARRAY_AGG(mt.tag_name) FILTER (WHERE mt.tag_name IS NOT NULL) AS tags
+        FROM rankings r
+        JOIN meals m ON r.meal_id = m.id
+        LEFT JOIN meal_tags mt ON m.id = mt.meal_id
+        WHERE r.user_id = $1
+    `;
+    const queryParams: (string | number)[] = [userId];
+
+    if (mealId) {
+        queryText += ` AND r.meal_id = $2`;
+        queryParams.push(mealId as string);
+    }
+
+    queryText += `
+        GROUP BY r.rank_position, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made
+        ORDER BY r.rank_position ASC
+    `;
+
+    const result: QueryResult = await pool.query(queryText, queryParams);
     res.status(200).json(result.rows);
-  } catch (error: unknown) { // Add error: unknown type
+  } catch (error: unknown) {
     console.error('Error fetching ranked meals:', error);
-    res.status(500).json({ message: 'Server error fetching ranked meals.' });
+    res.status(500).json({ message: 'Server error fetching meals.' });
   }
 };
 
 const deleteMealRank = async (req: Request, res: Response) => {
-  const { mealId } = req.params; // Using mealId as path parameter
+  const { mealId } = req.params;
   const userId = req.user?.id;
 
   if (!userId) {
@@ -120,7 +120,7 @@ const deleteMealRank = async (req: Request, res: Response) => {
 
       res.status(200).json({ message: 'Meal rank removed successfully.', deletedRank: result.rows[0] });
 
-  } catch (error: unknown) { // Add error: unknown type
+  } catch (error: unknown) {
       console.error('Error deleting meal rank:', error);
       res.status(500).json({ message: 'Server error deleting meal rank.' });
   }

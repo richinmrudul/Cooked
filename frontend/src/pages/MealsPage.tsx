@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApiClient } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom'; // Ensure Link is imported
+import { Link } from 'react-router-dom';
 
 interface Meal {
   id: string;
@@ -9,14 +9,14 @@ interface Meal {
   description?: string;
   date_made: string;
   photo_url?: string;
-  overall_rating: number;
+  overall_rating: number; // Keep this in the interface, just not displaying it
   tags?: string[];
   created_at: string;
 }
 
 const MealsPage: React.FC = () => {
   const { authFetch } = useApiClient();
-  const { user, logout } = useAuth(); // Ensure logout is destructured from useAuth()
+  const { user, logout } = useAuth();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ const MealsPage: React.FC = () => {
             View Rankings
           </Link>
           <button
-            onClick={logout} // This should now be recognized
+            onClick={logout}
             style={{ padding: '8px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
           >
             Logout
@@ -94,7 +94,7 @@ const MealsPage: React.FC = () => {
               <div style={{ padding: '15px' }}>
                 <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>{meal.title}</h3>
                 <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px' }}>
-                  Date: {new Date(meal.date_made).toLocaleDateString()} | Rating: {meal.overall_rating}/5
+                  Date: {new Date(meal.date_made).toLocaleDateString()} {/* Removed Rating display here */}
                 </p>
                 {meal.description && <p style={{ fontSize: '0.9em', color: '#777', marginBottom: '10px' }}>{meal.description}</p>}
                 {meal.tags && meal.tags.length > 0 && (

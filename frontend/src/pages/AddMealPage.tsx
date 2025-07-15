@@ -2,16 +2,20 @@ import React, { useState } from 'react';
 import { useApiClient } from '../api/apiClient';
 import { useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
+import RatingModal from '../components/RatingModal';
+import ComparisonModal from '../components/ComparisonModal';
 
-// Add Ingredient type definition
 interface IngredientFormData {
   name: string;
-  quantity: string; // Keep as string for input, convert to number on submit
+  quantity: string;
   unit: string;
-  calories?: string; // Optional, keep as string
-  protein?: string;
-  carbs?: string;
-  fat?: string;
+}
+
+interface MealForComparison {
+  id: string;
+  title: string;
+  photo_url?: string;
+  overall_rating: number;
 }
 
 const AddMealPage: React.FC = () => {
@@ -22,26 +26,30 @@ const AddMealPage: React.FC = () => {
     description: '',
     date_made: new Date().toISOString().split('T')[0],
     photo_url: '',
-    overall_rating: 3,
+    overall_rating: 3, // Keep a default value, as backend expects it (NOT NULL)
     tags: '',
   });
-  // New state for ingredients
   const [ingredients, setIngredients] = useState<IngredientFormData[]>([
-    { name: '', quantity: '', unit: '' } // Start with one empty ingredient field
+    { name: '', quantity: '', unit: '' }
   ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
+  const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const [newlyAddedMeal, setNewlyAddedMeal] = useState<{ id: string; title: string; photo_url?: string } | null>(null);
+  const [mealToCompareWith, setMealToCompareWith] = useState<MealForComparison | null>(null);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handlers for dynamic ingredient fields
   const handleIngredientChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const newIngredients = [...ingredients];
-    (newIngredients[index] as any)[name] = value; // Type assertion needed for dynamic property
+    (newIngredients[index] as any)[name] = value;
     setIngredients(newIngredients);
   };
 
@@ -61,27 +69,22 @@ const AddMealPage: React.FC = () => {
 
     const mealData = {
       ...formData,
-      overall_rating: Number(formData.overall_rating),
+      // overall_rating will be 3 initially (from state), then updated by modal
       tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      // Prepare ingredients for backend: convert quantity/macros to numbers
       ingredients: ingredients.map(ing => ({
         name: ing.name.trim(),
         quantity: Number(ing.quantity) || 0,
         unit: ing.unit.trim(),
-        calories: ing.calories ? Number(ing.calories) : undefined,
-        protein: ing.protein ? Number(ing.protein) : undefined,
-        carbs: ing.carbs ? Number(ing.carbs) : undefined,
-        fat: ing.fat ? Number(ing.fat) : undefined,
-      })).filter(ing => ing.name && ing.quantity > 0) // Filter out empty or zero-quantity ingredients
+      })).filter(ing => ing.name && ing.quantity > 0)
     };
 
     try {
-      await authFetch('/meals', {
+      const response = await authFetch('/meals', {
         method: 'POST',
         body: JSON.stringify(mealData),
       });
-      alert('Meal added successfully!');
-      navigate('/meals'); // Navigate back to meals list
+      setNewlyAddedMeal({ id: response.meal.id, title: response.meal.title, photo_url: response.meal.photo_url });
+      setIsRatingModalOpen(true); // Open the initial rating modal
     } catch (err: any) {
       setError(err.message || 'Failed to add meal.');
       console.error('Error adding meal:', err);
@@ -90,11 +93,135 @@ const AddMealPage: React.FC = () => {
     }
   };
 
+  const handleModalRating = async (rating: number) => {
+    setIsRatingModalOpen(false); // Close rating modal
+    if (!newlyAddedMeal) {
+      navigate('/meals');
+      return;
+    }
+
+    try {
+      // 1. Update the meal's overall rating
+      const currentMealData = await authFetch(`/meals/${newlyAddedMeal.id}`);
+      await authFetch(`/meals/${newlyAddedMeal.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          // Send all other existing data to PUT, including original tags and ingredients
+          title: currentMealData.title,
+          description: currentMealData.description,
+          date_made: currentMealData.date_made,
+          photo_url: currentMealData.photo_url,
+          tags: currentMealData.tags,
+          ingredients: currentMealData.ingredients.map((ing: any) => ({
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: ing.unit,
+              calories: ing.calories, // Keep existing macros if they were there
+              protein: ing.protein,
+              carbs: ing.carbs,
+              fat: ing.fat,
+          })),
+          overall_rating: rating, // Update rating
+        }),
+      });
+
+      // 2. Potentially set an initial rank based on initial rating
+      let suggestedRank: number | undefined;
+      if (rating === 5) suggestedRank = 1; // Good
+      else if (rating === 3) suggestedRank = 5; // Okay
+      // If rating is 1 (Bad), no initial rank suggested by this logic
+
+      if (suggestedRank !== undefined) {
+          await authFetch('/rankings', {
+              method: 'POST',
+              body: JSON.stringify({ mealId: newlyAddedMeal.id, rankPosition: suggestedRank }),
+          });
+      }
+
+      // 3. Prepare for comparison if rating is Good/Okay and other meals exist
+      if (rating === 5 || rating === 3) {
+        const allMeals = await authFetch('/meals');
+        const comparableMeals = allMeals.filter(
+          (m: MealForComparison) =>
+            m.id !== newlyAddedMeal.id && (m.overall_rating === 5 || m.overall_rating === 3)
+        );
+
+        if (comparableMeals.length > 0) {
+          const randomIndex = Math.floor(Math.random() * comparableMeals.length);
+          setMealToCompareWith(comparableMeals[randomIndex]);
+          setIsComparisonModalOpen(true); // Open the comparison modal
+          return; // Stop here, comparison modal will handle final navigation
+        }
+      }
+
+      // If no comparison is needed/possible, navigate
+      alert('Meal added and rated successfully!');
+      navigate('/meals');
+    } catch (err: any) {
+      console.error('Error in post-rating logic:', err);
+      alert('Meal added, but failed to update rating/rank or start comparison. Check console.');
+      navigate('/meals');
+    }
+  };
+
+  const handleComparisonResult = async (betterMealId: string | null) => {
+    setIsComparisonModalOpen(false); // Close comparison modal
+    if (!newlyAddedMeal || !mealToCompareWith) {
+      navigate('/meals');
+      return;
+    }
+
+    try {
+      let targetRank: number; // Now explicitly a number
+
+      // Fetch current rank of compared meal (if it's ranked)
+      const rankedComparedResult = await authFetch(`/rankings?mealId=${mealToCompareWith.id}`);
+      const currentComparedRank: number | undefined = rankedComparedResult[0]?.rank_position; // This can be number | undefined
+
+      if (betterMealId === newlyAddedMeal.id) {
+        // New meal is better: try to give it 1 higher rank (lower number) than compared meal, or rank 1
+        if (currentComparedRank !== undefined) {
+          targetRank = Math.max(1, currentComparedRank - 1);
+        } else {
+          targetRank = 1; // If compared meal not ranked, new meal gets rank 1
+        }
+      } else if (betterMealId === mealToCompareWith.id) {
+        // New meal is worse: try to give it 1 lower rank (higher number) than compared meal
+        if (currentComparedRank !== undefined) {
+          targetRank = currentComparedRank + 1;
+        } else {
+          targetRank = 10; // If compared meal not ranked, new meal gets rank 10
+        }
+      } else {
+        // They're equal: try to give it same rank as compared meal, or default 5
+        if (currentComparedRank !== undefined) {
+          targetRank = currentComparedRank;
+        } else {
+          targetRank = 5; // If compared meal not ranked, new meal defaults to rank 5
+        }
+      }
+
+      // Ensure targetRank is strictly within 1-10 range before sending to API
+      targetRank = Math.min(10, Math.max(1, targetRank));
+
+      await authFetch('/rankings', {
+        method: 'POST',
+        body: JSON.stringify({ mealId: newlyAddedMeal.id, rankPosition: targetRank }),
+      });
+      alert('Meal ranked based on comparison!');
+
+    } catch (err: any) {
+      console.error('Error during comparison ranking:', err);
+      alert('Meal added, but comparison ranking failed. Check console.');
+    } finally {
+      navigate('/meals'); // Finally navigate to meals list
+    }
+  };
+
   return (
     <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
       <h2>Add New Meal</h2>
       <form onSubmit={handleSubmit}>
-        {/* Existing fields for title, description, date_made, photo_url, overall_rating, tags */}
         <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Title:</label>
           <input type="text" name="title" value={formData.title} onChange={handleChange} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
@@ -112,15 +239,10 @@ const AddMealPage: React.FC = () => {
           <input type="url" name="photo_url" value={formData.photo_url} onChange={handleChange} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
         </div>
         <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Overall Rating (1-5):</label>
-          <input type="number" name="overall_rating" value={formData.overall_rating} onChange={handleChange} min="1" max="5" required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
-        </div>
-        <div style={{ marginBottom: '15px' }}>
           <label style={{ display: 'block', marginBottom: '5px' }}>Tags (comma-separated):</label>
           <input type="text" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
         </div>
 
-        {/* NEW: Ingredients Section */}
         <h3 style={{ marginTop: '30px', marginBottom: '15px' }}>Ingredients</h3>
         {ingredients.map((ingredient, index) => (
           <div key={index} style={{ border: '1px dashed #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
@@ -160,56 +282,6 @@ const AddMealPage: React.FC = () => {
                 />
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Calories:</label>
-                    <input
-                        type="number"
-                        name="calories"
-                        value={ingredient.calories || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="kcal"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Protein:</label>
-                    <input
-                        type="number"
-                        name="protein"
-                        value={ingredient.protein || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="g"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Carbs:</label>
-                    <input
-                        type="number"
-                        name="carbs"
-                        value={ingredient.carbs || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="g"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-                <div>
-                    <label style={{ display: 'block', marginBottom: '5px' }}>Fat:</label>
-                    <input
-                        type="number"
-                        name="fat"
-                        value={ingredient.fat || ''}
-                        onChange={(e) => handleIngredientChange(index, e)}
-                        placeholder="g"
-                        step="0.1"
-                        style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
-                    />
-                </div>
-            </div>
             {ingredients.length > 1 && (
               <button type="button" onClick={() => handleRemoveIngredient(index)} style={{ padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8em', marginTop: '10px' }}>
                 Remove Ingredient
@@ -231,6 +303,27 @@ const AddMealPage: React.FC = () => {
           </Link>
         </div>
       </form>
+
+      {/* Rating Modal */}
+      {newlyAddedMeal && (
+        <RatingModal
+          isOpen={isRatingModalOpen}
+          onClose={() => { setIsRatingModalOpen(false); navigate('/meals'); }}
+          onRate={handleModalRating}
+          mealTitle={newlyAddedMeal.title}
+        />
+      )}
+
+      {/* Comparison Modal */}
+      {newlyAddedMeal && mealToCompareWith && (
+        <ComparisonModal
+          isOpen={isComparisonModalOpen}
+          onClose={() => { setIsComparisonModalOpen(false); navigate('/meals'); }}
+          onCompare={handleComparisonResult}
+          newMeal={{ id: newlyAddedMeal.id, title: newlyAddedMeal.title, photo_url: newlyAddedMeal.photo_url }}
+          comparedMeal={mealToCompareWith}
+        />
+      )}
     </div>
   );
 };
