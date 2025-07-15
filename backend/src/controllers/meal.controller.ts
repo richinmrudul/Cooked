@@ -2,6 +2,17 @@ import { Request, Response } from 'express';
 import pool from '../db';
 import { QueryResult } from 'pg';
 
+interface IngredientInput {
+  id?: string; // ADDED: Optional ID for when we retrieve it from DB or for clarity
+  name: string;
+  quantity: number;
+  unit?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+}
+
 interface Meal {
   id: string;
   user_id: string;
@@ -10,17 +21,19 @@ interface Meal {
   date_made: string;
   photo_url: string;
   overall_rating: number;
-  tags: string[];
+  tags?: string[];
+  ingredients?: Array<IngredientInput>; // Use IngredientInput here directly now that it has ID
+  created_at: string;
 }
 
 const createMeal = async (req: Request, res: Response) => {
-  const { title, description, date_made, photo_url, overall_rating, tags } = req.body;
-  const userId = req.user?.id; // user ID from authenticated request
+  const { title, description, date_made, photo_url, overall_rating, tags, ingredients } = req.body;
+  const userId = req.user?.id;
 
   if (!userId) {
     return res.status(401).json({ message: 'User not authenticated.' });
   }
-  if (!title || !date_made || !overall_rating) {
+  if (!title || !date_made || overall_rating === undefined) {
     return res.status(400).json({ message: 'Title, date_made, and overall_rating are required.' });
   }
   if (overall_rating < 1 || overall_rating > 5) {
@@ -28,6 +41,8 @@ const createMeal = async (req: Request, res: Response) => {
   }
 
   try {
+    await pool.query('BEGIN');
+
     const mealResult: QueryResult = await pool.query(
       `INSERT INTO meals (user_id, title, description, date_made, photo_url, overall_rating)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_id, title, description, date_made, photo_url, overall_rating, created_at`,
@@ -42,8 +57,37 @@ const createMeal = async (req: Request, res: Response) => {
       }
     }
 
-    res.status(201).json({ message: 'Meal created successfully', meal: { ...newMeal, tags: tags || [] } });
-  } catch (error) {
+    const addedIngredients: IngredientInput[] = [];
+    if (ingredients && ingredients.length > 0) {
+      for (const ingredient of ingredients as IngredientInput[]) {
+        const ingResult: QueryResult = await pool.query(
+          `INSERT INTO ingredients (name, calories, protein, carbs, fat)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (name) DO UPDATE SET
+               calories = EXCLUDED.calories,
+               protein = EXCLUDED.protein,
+               carbs = EXCLUDED.carbs,
+               fat = EXCLUDED.fat
+           RETURNING id, name`,
+          [ingredient.name, ingredient.calories, ingredient.protein, ingredient.carbs, ingredient.fat]
+        );
+        const ingId = ingResult.rows[0].id;
+
+        await pool.query(
+          'INSERT INTO meal_ingredients (meal_id, ingredient_id, quantity, unit) VALUES ($1, $2, $3, $4)',
+          [newMeal.id, ingId, ingredient.quantity, ingredient.unit]
+        );
+        addedIngredients.push({
+            ...ingredient, // Spread existing properties
+            id: ingId // Add the new ID
+        });
+      }
+    }
+
+    await pool.query('COMMIT');
+    res.status(201).json({ message: 'Meal created successfully', meal: { ...newMeal, tags: tags || [], ingredients: addedIngredients } });
+  } catch (error: unknown) {
+    await pool.query('ROLLBACK');
     console.error('Error creating meal:', error);
     res.status(500).json({ message: 'Server error creating meal.' });
   }
@@ -64,13 +108,13 @@ const getMeals = async (req: Request, res: Response) => {
        FROM meals m
        LEFT JOIN meal_tags mt ON m.id = mt.meal_id
        WHERE m.user_id = $1
-       GROUP BY m.id
+       GROUP BY m.id, m.user_id, m.title, m.description, m.date_made, m.photo_url, m.overall_rating, m.created_at
        ORDER BY m.date_made DESC, m.created_at DESC`,
       [userId]
     );
 
     res.status(200).json(result.rows);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching meals:', error);
     res.status(500).json({ message: 'Server error fetching meals.' });
   }
@@ -99,7 +143,7 @@ const getMealById = async (req: Request, res: Response) => {
        LEFT JOIN meal_ingredients mi ON m.id = mi.meal_id
        LEFT JOIN ingredients i ON mi.ingredient_id = i.id
        WHERE m.id = $1 AND m.user_id = $2
-       GROUP BY m.id`,
+       GROUP BY m.id, m.user_id, m.title, m.description, m.date_made, m.photo_url, m.overall_rating, m.created_at`,
       [id, userId]
     );
 
@@ -110,7 +154,7 @@ const getMealById = async (req: Request, res: Response) => {
     }
 
     res.status(200).json(meal);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching meal by ID:', error);
     res.status(500).json({ message: 'Server error fetching meal.' });
   }
@@ -119,13 +163,13 @@ const getMealById = async (req: Request, res: Response) => {
 
 const updateMeal = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { title, description, date_made, photo_url, overall_rating, tags } = req.body;
+  const { title, description, date_made, photo_url, overall_rating, tags, ingredients } = req.body;
   const userId = req.user?.id;
 
   if (!userId) {
     return res.status(401).json({ message: 'User not authenticated.' });
   }
-  if (!title || !date_made || !overall_rating) {
+  if (!title || !date_made || overall_rating === undefined) {
     return res.status(400).json({ message: 'Title, date_made, and overall_rating are required.' });
   }
   if (overall_rating < 1 || overall_rating > 5) {
@@ -133,6 +177,8 @@ const updateMeal = async (req: Request, res: Response) => {
   }
 
   try {
+    await pool.query('BEGIN');
+
     const mealResult: QueryResult = await pool.query(
       `UPDATE meals
        SET title = $1, description = $2, date_made = $3, photo_url = $4, overall_rating = $5
@@ -142,11 +188,11 @@ const updateMeal = async (req: Request, res: Response) => {
     );
 
     if (mealResult.rowCount === 0) {
+      await pool.query('ROLLBACK');
       return res.status(404).json({ message: 'Meal not found or not authorized.' });
     }
     const updatedMeal = mealResult.rows[0];
 
-    // Update tags: remove old ones, add new ones
     await pool.query('DELETE FROM meal_tags WHERE meal_id = $1', [id]);
     if (tags && tags.length > 0) {
       for (const tagName of tags) {
@@ -155,8 +201,38 @@ const updateMeal = async (req: Request, res: Response) => {
       }
     }
 
-    res.status(200).json({ message: 'Meal updated successfully', meal: { ...updatedMeal, tags: tags || [] } });
-  } catch (error) {
+    await pool.query('DELETE FROM meal_ingredients WHERE meal_id = $1', [id]);
+    const updatedIngredients: IngredientInput[] = [];
+    if (ingredients && ingredients.length > 0) {
+      for (const ingredient of ingredients as IngredientInput[]) {
+        const ingResult: QueryResult = await pool.query(
+          `INSERT INTO ingredients (name, calories, protein, carbs, fat)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (name) DO UPDATE SET
+               calories = EXCLUDED.calories,
+               protein = EXCLUDED.protein,
+               carbs = EXCLUDED.carbs,
+               fat = EXCLUDED.fat
+           RETURNING id, name`,
+          [ingredient.name, ingredient.calories, ingredient.protein, ingredient.carbs, ingredient.fat]
+        );
+        const ingId = ingResult.rows[0].id;
+
+        await pool.query(
+          'INSERT INTO meal_ingredients (meal_id, ingredient_id, quantity, unit) VALUES ($1, $2, $3, $4)',
+          [id, ingId, ingredient.quantity, ingredient.unit]
+        );
+        updatedIngredients.push({
+            ...ingredient,
+            id: ingId
+        });
+      }
+    }
+
+    await pool.query('COMMIT');
+    res.status(200).json({ message: 'Meal updated successfully', meal: { ...updatedMeal, tags: tags || [], ingredients: updatedIngredients } });
+  } catch (error: unknown) {
+    await pool.query('ROLLBACK');
     console.error('Error updating meal:', error);
     res.status(500).json({ message: 'Server error updating meal.' });
   }
@@ -181,7 +257,7 @@ const deleteMeal = async (req: Request, res: Response) => {
     }
 
     res.status(200).json({ message: 'Meal deleted successfully' });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error deleting meal:', error);
     res.status(500).json({ message: 'Server error deleting meal.' });
   }
