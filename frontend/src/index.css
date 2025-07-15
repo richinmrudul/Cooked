@@ -1,0 +1,515 @@
+/* ---------------------------------------------------- */
+/* Global Reset & Base Styles */
+/* ---------------------------------------------------- */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Define CSS Variables for Theme Colors (Inspired by Pantry Pilot) */
+:root {
+  --color-primary: #6c63ff; /* A soft, appealing blue/purple */
+  --color-primary-light: #8e88ff; /* Lighter for hover */
+  --color-primary-dark: #5a54d9; /* Darker for active */
+
+  --color-secondary: #e0e0e0; /* For light borders/background elements */
+  --color-secondary-text: #666; /* Muted gray for secondary text */
+
+  --color-success: #4CAF50; /* Green */
+  --color-danger: #f44336; /* Red */
+  --color-warning: #ffc107; /* Orange */
+  --color-info: #2196F3; /* Bright blue */
+
+  --color-background: #f0f2f5; /* Very light gray/off-white background */
+  --color-card-background: #ffffff;
+  --color-text: #333; /* Dark charcoal */
+  --color-light-text: #888; /* Lighter text for hints */
+  --color-border: #e0e0e0; /* Soft gray border */
+  --color-shadow-light: rgba(0, 0, 0, 0.05); /* Very subtle shadow */
+  --color-shadow-medium: rgba(0, 0, 0, 0.1); /* Slightly more visible shadow */
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* REMOVED: display: flex; flex-direction: column; justify-content: center; align-items: center; */
+}
+
+/* Global Typography Adjustments */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-text);
+  margin-bottom: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+h1 { font-size: 2.5em; margin-bottom: 25px;}
+h2 { font-size: 2em; }
+h3 { font-size: 1.5em; }
+
+p {
+    line-height: 1.8;
+    color: var(--color-light-text);
+}
+
+/* Basic Link Styling */
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.2s ease, opacity 0.2s ease;
+}
+
+a:hover {
+  color: var(--color-primary-light);
+  opacity: 0.9;
+}
+
+/* ---------------------------------------------------- */
+/* Layout & Utility Classes */
+/* ---------------------------------------------------- */
+
+/* Main Content Wrapper - for centering pages within the app */
+.app-main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* Center content vertically within this wrapper */
+  align-items: center; /* Center content horizontally within this wrapper */
+  min-height: 100vh; /* Ensure it takes full viewport height */
+  width: 100%;
+  padding: 20px; /* Some padding around the edges */
+  box-sizing: border-box;
+}
+
+/* Card/Container Styling */
+.card {
+  background-color: var(--color-card-background);
+  border-radius: 12px;
+  box-shadow: 0 8px 25px var(--color-shadow-medium);
+  padding: 40px;
+  margin: 20px auto;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+}
+
+.card-sm { max-width: 450px; }
+.card-md { max-width: 750px; }
+.card-lg { max-width: 1000px; }
+
+/* Forms */
+.form-group {
+  margin-bottom: 25px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 1em;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 1em;
+  color: var(--color-text);
+  background-color: #fcfcfc;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(108, 99, 255, 0.2);
+}
+
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+/* Buttons */
+.btn {
+  padding: 14px 30px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1.05em;
+  font-weight: 600;
+  transition: background-color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+  margin: 8px;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 15px var(--color-shadow-medium);
+}
+
+.btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px var(--color-shadow-light);
+}
+
+/* Primary Button (Solid Blue/Purple) */
+.btn-primary {
+  background-color: var(--color-primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.2);
+}
+.btn-primary:hover:not(:disabled) { background-color: var(--color-primary-light); }
+.btn-primary:active { background-color: var(--color-primary-dark); }
+
+/* Outline Primary Button */
+.btn-outline-primary {
+  background-color: transparent;
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  box-shadow: none;
+}
+.btn-outline-primary:hover:not(:disabled) {
+  background-color: var(--color-primary);
+  color: white;
+  box-shadow: 0 4px 15px rgba(108, 99, 255, 0.2);
+}
+.btn-outline-primary:active { background-color: var(--color-primary-dark); }
+
+
+/* Other Semantic Buttons */
+.btn-success { background-color: var(--color-success); color: white; }
+.btn-danger { background-color: var(--color-danger); color: white; }
+.btn-warning { background-color: var(--color-warning); color: var(--color-text); }
+.btn-info { background-color: var(--color-info); color: white; }
+.btn-secondary-muted { background-color: var(--color-secondary); color: white; }
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------- */
+/* Flexbox & Grid Utilities */
+/* ---------------------------------------------------- */
+.d-flex { display: flex; }
+.flex-column { flex-direction: column; }
+.align-items-start { align-items: flex-start; }
+.align-items-center { align-items: center; }
+.justify-content-start { justify-content: flex-start; }
+.justify-content-end { justify-content: flex-end; }
+.justify-content-center { justify-content: center; }
+.justify-content-between { justify-content: space-between; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-grow-1 { flex-grow: 1; }
+.flex-shrink-0 { flex-shrink: 0; }
+
+.gap-10 { gap: 10px; }
+.gap-15 { gap: 15px; }
+.gap-20 { gap: 20px; }
+.gap-30 { gap: 30px; }
+
+.grid-layout { display: grid; }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-gap-10 { gap: 10px; }
+.grid-gap-20 { gap: 20px; }
+
+/* ---------------------------------------------------- */
+/* Spacing & Text Utilities */
+/* ---------------------------------------------------- */
+.mb-10 { margin-bottom: 10px; }
+.mb-15 { margin-bottom: 15px; }
+.mb-20 { margin-bottom: 20px; }
+.mb-30 { margin-bottom: 30px; }
+.mt-10 { margin-top: 10px; }
+.mt-15 { margin-top: 15px; }
+.mt-20 { margin-top: 20px; }
+.mt-30 { margin-top: 30px; }
+.mr-10 { margin-right: 10px; }
+.ml-10 { margin-left: 10px; }
+.p-15 { padding: 15px; }
+.p-20 { padding: 20px; }
+.p-30 { padding: 30px; }
+
+.text-center { text-align: center; }
+.text-right { text-align: right; }
+.text-muted { color: var(--color-light-text); }
+.text-error { color: var(--color-danger); }
+.text-bold { font-weight: bold; }
+.text-italic { font-style: italic; }
+
+/* ---------------------------------------------------- */
+/* Specific Component Styles (Will be refactored into components) */
+/* ---------------------------------------------------- */
+.meal-card {
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px var(--color-shadow-light);
+    background-color: var(--color-card-background);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.meal-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px var(--color-shadow-medium);
+}
+
+.meal-card-image {
+    width: 100%;
+    height: 180px;
+    object-fit: cover;
+}
+
+.meal-card-content {
+    padding: 15px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.meal-card-title {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--color-text);
+}
+
+.meal-card-date {
+    font-size: 0.9em;
+    color: var(--color-light-text);
+    margin-bottom: 10px;
+}
+
+.meal-card-description,
+.meal-card-tags {
+    font-size: 0.9em;
+    color: var(--color-secondary-text);
+    margin-bottom: 10px;
+}
+
+.meal-card-actions {
+    margin-top: auto;
+    padding-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.ranked-meal-item {
+    display: flex;
+    align-items: center;
+    background-color: var(--color-card-background);
+    border-radius: 10px;
+    box-shadow: 0 4px 10px var(--color-shadow-light);
+    padding: 15px 20px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ranked-meal-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px var(--color-shadow-medium);
+}
+
+.rank-indicator {
+    flex-shrink: 0;
+    width: 50px;
+    height: 50px;
+    background-color: var(--color-primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.5em;
+    font-weight: bold;
+    margin-right: 20px;
+}
+
+.ranked-meal-image {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-right: 20px;
+}
+
+.ranked-meal-details {
+    flex-grow: 1;
+}
+
+.ranked-meal-title {
+    font-size: 1.25em;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--color-text);
+}
+
+.ranked-meal-date {
+    font-size: 0.9em;
+    color: var(--color-light-text);
+}
+
+.ranked-meal-actions {
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    margin-left: 20px;
+}
+
+
+/* ---------------------------------------------------- */
+/* Header Specific Styles */
+/* ---------------------------------------------------- */
+.auth-header {
+    text-align: center;
+    margin-bottom: 40px; /* Space below the header */
+    padding: 20px 0;
+}
+
+.auth-header-title {
+    font-size: 2.8em; /* Larger title */
+    font-weight: 800; /* Extra bold */
+    color: var(--color-primary); /* Primary theme color */
+    margin-bottom: 10px;
+}
+
+.auth-header-title .auth-header-link {
+    color: inherit; /* Inherit color from parent */
+    text-decoration: none;
+}
+
+.auth-header-subtitle {
+    font-size: 1.1em;
+    color: var(--color-secondary-text);
+    font-weight: 400;
+    margin-top: -10px; /* Pull it closer to title */
+}
+
+.app-header {
+    background-color: var(--color-card-background);
+    padding: 15px 30px;
+    box-shadow: 0 2px 8px var(--color-shadow-light);
+    width: 100%;
+    position: fixed; /* Keep it at the top */
+    top: 0;
+    left: 0;
+    z-index: 100;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.app-header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.app-title {
+    font-size: 1.8em;
+    font-weight: 700;
+    margin: 0; /* Remove default h1 margin */
+}
+
+.app-title .app-title-link {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.app-welcome-text {
+    font-size: 1em;
+    color: var(--color-light-text);
+    font-weight: 500;
+}
+
+.app-nav .btn { /* Adjust btn margins for nav bar */
+    margin: 0 5px;
+    padding: 8px 15px; /* Smaller padding for nav buttons */
+    font-size: 0.9em;
+}
+
+/* Adjust main content padding to account for fixed header */
+.app-main-content {
+    padding-top: 80px; /* Height of header + some space */
+}
+
+/* ---------------------------------------------------- */
+/* Landing Page Specific Styles */
+/* ---------------------------------------------------- */
+.landing-page-container {
+    text-align: center;
+    padding: 20px;
+    max-width: 600px;
+    margin: auto;
+}
+
+.landing-page-title {
+    font-size: 3.5em; /* Even larger title */
+    font-weight: 800;
+    color: var(--color-primary);
+    margin-bottom: 15px;
+}
+
+.landing-page-subtitle {
+    font-size: 1.3em;
+    color: var(--color-secondary-text);
+    margin-top: -10px;
+    margin-bottom: 30px;
+}
+
+
+.btn-lg {
+    padding: 16px 35px; /* Larger padding */
+    font-size: 1.15em; /* Larger font */
+}
+
+/* ---------------------------------------------------- */
+/* Header Specific Styles (Adjusted for Landing Page) */
+/* ---------------------------------------------------- */
+
+.auth-header { /* Keep if some elements like general auth-header-link need it */
+    /* display: none; */ /* Or control visibility in App.tsx */
+}
+.auth-header-title, .auth-header-subtitle { /* Keep if these classes are reused */
+    /* ... styles ... */
+}
+
+
+/* Ingredient Item Specific Styles */
+.ingredient-item {
+    border: 1px solid var(--color-border); /* Subtle border */
+    border-radius: 8px; /* Rounded corners */
+    padding: 20px; /* Generous padding */
+    margin-bottom: 20px; /* Space between items */
+    background-color: #fdfdfd; /* Slightly different background */
+    box-shadow: 0 2px 5px var(--color-shadow-light); /* Subtle shadow */
+}
+
+/* Adjust form-group margins within ingredient items if needed */
+.ingredient-item .form-group {
+    margin-bottom: 15px; /* Less margin inside ingredient item */
+}

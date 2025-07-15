@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: string;
-  name: string;
+  firstName: string; // Added firstName
+  lastName: string;  // Added lastName
   email: string;
 }
 
@@ -11,7 +12,8 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  // Updated register function signature
+  register: (firstName: string, lastName: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -69,18 +71,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(data.user));
       setToken(data.token);
       setUser(data.user);
-      navigate('/meals'); // Navigate to a meals or home page after login
+      navigate('/meals'); // Navigate to meals list after login
     } finally {
       setLoading(false);
     }
   };
 
-  const register = async (name: string, email: string, password: string) => {
+  // Updated register function to accept firstName and lastName
+  const register = async (firstName: string, lastName: string, email: string, password: string) => {
     setLoading(true);
     try {
-      const data = await callAuthApi('register', { name, email, password });
-      alert(data.message); // For now, just an alert
-      navigate('/login'); // Redirect to login page after successful registration
+      const data = await callAuthApi('register', { firstName, lastName, email, password });
+      alert(data.message);
+      navigate('/login');
     } finally {
       setLoading(false);
     }
@@ -90,7 +93,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.clear();
     setToken(null);
     setUser(null);
-    navigate('/login'); // Redirect to login page after logout
+    navigate('/login');
   };
 
   return (

@@ -9,9 +9,14 @@ interface Meal {
   description?: string;
   date_made: string;
   photo_url?: string;
-  overall_rating: number; // Keep this in the interface, just not displaying it
+  overall_rating: number;
   tags?: string[];
   created_at: string;
+  ingredients?: Array<{
+    name: string;
+    quantity: number;
+    unit?: string;
+  }>;
 }
 
 const MealsPage: React.FC = () => {
@@ -55,59 +60,65 @@ const MealsPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading meals...</div>;
+    return <div className="app-main-content text-center">Loading meals...</div>;
   }
 
   if (error) {
-    return <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>Error: {error}</div>;
+    return <div className="app-main-content text-center text-error">Error: {error}</div>;
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1000px', margin: '50px auto', border: '1px solid #eee', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="card card-lg">
+      <div className="d-flex justify-content-between align-items-center mb-20">
         <h2>Your Cooked Meals</h2>
-        <div>
-          <Link to="/meals/new" style={{ padding: '8px 15px', backgroundColor: '#28a745', color: 'white', textDecoration: 'none', borderRadius: '4px', marginRight: '10px' }}>
+        <div className="d-flex gap-10">
+          <Link to="/meals/new" className="btn btn-success">
             Add New Meal
           </Link>
-          <Link to="/rankings" style={{ padding: '8px 15px', backgroundColor: '#6f42c1', color: 'white', textDecoration: 'none', borderRadius: '4px', marginRight: '10px' }}>
+          <Link to="/rankings" className="btn btn-info">
             View Rankings
           </Link>
-          <button
-            onClick={logout}
-            style={{ padding: '8px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
+          <button onClick={logout} className="btn btn-danger">
             Logout
           </button>
         </div>
       </div>
 
       {meals.length === 0 ? (
-        <p style={{ textAlign: 'center', fontSize: '1.2em', color: '#555' }}>No meals cooked yet! Add your first meal.</p>
+        <p className="text-center text-muted p-20">{/* Corrected comment syntax */}No meals cooked yet! Add your first meal.</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
+        <div className="grid-layout grid-cols-2 grid-gap-20"> {/* Changed to grid-cols-2 for consistent 2-column layout */}
           {meals.map((meal) => (
-            <div key={meal.id} style={{ border: '1px solid #ddd', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+            <div key={meal.id} className="meal-card">
               {meal.photo_url && (
-                <img src={meal.photo_url} alt={meal.title} style={{ width: '100%', height: '200px', objectFit: 'cover' }} />
+                <img src={meal.photo_url} alt={meal.title} className="meal-card-image" />
               )}
-              <div style={{ padding: '15px' }}>
-                <h3 style={{ margin: '0 0 10px 0', color: '#333' }}>{meal.title}</h3>
-                <p style={{ fontSize: '0.9em', color: '#666', marginBottom: '10px' }}>
-                  Date: {new Date(meal.date_made).toLocaleDateString()} {/* Removed Rating display here */}
+              <div className="meal-card-content">
+                <h3 className="meal-card-title">{meal.title}</h3>
+                <p className="meal-card-date">
+                  Made: {new Date(meal.date_made).toLocaleDateString()}
                 </p>
-                {meal.description && <p style={{ fontSize: '0.9em', color: '#777', marginBottom: '10px' }}>{meal.description}</p>}
+                {meal.description && <p className="meal-card-description">{meal.description}</p>}
                 {meal.tags && meal.tags.length > 0 && (
-                  <p style={{ fontSize: '0.8em', color: '#888', fontStyle: 'italic' }}>Tags: {meal.tags.join(', ')}</p>
+                  <p className="meal-card-tags text-italic">Tags: {meal.tags.join(', ')}</p>
                 )}
-                <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
-                  <Link to={`/meals/edit/${meal.id}`} style={{ padding: '6px 12px', backgroundColor: '#ffc107', color: '#333', textDecoration: 'none', borderRadius: '4px', fontSize: '0.9em' }}>
+                {meal.ingredients && meal.ingredients.length > 0 && (
+                    <div className="meal-card-ingredients mt-10">
+                        <h4 style={{fontSize: '1em', marginBottom: '5px', color: 'var(--color-text)'}}>Ingredients:</h4>
+                        <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9em', color: 'var(--color-secondary-text)'}}>
+                            {meal.ingredients.map((ing, i) => (
+                                <li key={i}>{ing.quantity} {ing.unit} {ing.name}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                <div className="meal-card-actions">
+                  <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm">
                     Edit
                   </Link>
                   <button
                     onClick={() => handleDelete(meal.id)}
-                    style={{ padding: '6px 12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9em' }}
-                  >
+                    className="btn btn-danger btn-sm">
                     Delete
                   </button>
                 </div>

@@ -25,13 +25,15 @@ const AddMealPage: React.FC = () => {
     title: '',
     description: '',
     date_made: new Date().toISOString().split('T')[0],
-    photo_url: '',
-    overall_rating: 3, // Keep a default value, as backend expects it (NOT NULL)
+    overall_rating: 3,
     tags: '',
   });
   const [ingredients, setIngredients] = useState<IngredientFormData[]>([
     { name: '', quantity: '', unit: '' }
   ]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null); // State for the selected file
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null); // State for image preview
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +46,17 @@ const AddMealPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setPhotoFile(file);
+      setPhotoPreview(URL.createObjectURL(file)); // Create a URL for preview
+    } else {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+    }
   };
 
   const handleIngredientChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -67,24 +80,32 @@ const AddMealPage: React.FC = () => {
     setError(null);
     setLoading(true);
 
-    const mealData = {
-      ...formData,
-      // overall_rating will be 3 initially (from state), then updated by modal
-      tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      ingredients: ingredients.map(ing => ({
-        name: ing.name.trim(),
-        quantity: Number(ing.quantity) || 0,
-        unit: ing.unit.trim(),
-      })).filter(ing => ing.name && ing.quantity > 0)
-    };
+    const formToSend = new FormData();
+    // Append all form data fields
+    formToSend.append('title', formData.title);
+    formToSend.append('description', formData.description);
+    formToSend.append('date_made', formData.date_made);
+    formToSend.append('overall_rating', String(formData.overall_rating)); // Convert number to string
+    formToSend.append('tags', JSON.stringify(formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag))); // Send tags as JSON string
+    formToSend.append('ingredients', JSON.stringify(ingredients.map(ing => ({ // Send ingredients as JSON string
+      name: ing.name.trim(),
+      quantity: Number(ing.quantity) || 0,
+      unit: ing.unit.trim(),
+    })).filter(ing => ing.name && ing.quantity > 0)));
+
+    // Append the file if selected
+    if (photoFile) {
+      formToSend.append('photo', photoFile); // 'photo' matches the fieldname in Multer config
+    }
 
     try {
       const response = await authFetch('/meals', {
         method: 'POST',
-        body: JSON.stringify(mealData),
+        body: formToSend, // Send FormData as body
+        // Headers: Content-Type is NOT explicitly set, browser will set multipart/form-data
       });
       setNewlyAddedMeal({ id: response.meal.id, title: response.meal.title, photo_url: response.meal.photo_url });
-      setIsRatingModalOpen(true); // Open the initial rating modal
+      setIsRatingModalOpen(true);
     } catch (err: any) {
       setError(err.message || 'Failed to add meal.');
       console.error('Error adding meal:', err);
@@ -94,42 +115,40 @@ const AddMealPage: React.FC = () => {
   };
 
   const handleModalRating = async (rating: number) => {
-    setIsRatingModalOpen(false); // Close rating modal
+    setIsRatingModalOpen(false);
     if (!newlyAddedMeal) {
       navigate('/meals');
       return;
     }
 
     try {
-      // 1. Update the meal's overall rating
+      // Need to fetch current meal data to get all existing fields (including tags/ingredients)
       const currentMealData = await authFetch(`/meals/${newlyAddedMeal.id}`);
+
+      const formToUpdate = new FormData();
+      formToUpdate.append('title', currentMealData.title);
+      formToUpdate.append('description', currentMealData.description);
+      formToUpdate.append('date_made', currentMealData.date_made);
+      formToUpdate.append('overall_rating', String(rating)); // Updated rating
+      formToUpdate.append('tags', JSON.stringify(currentMealData.tags || []));
+      formToUpdate.append('ingredients', JSON.stringify(currentMealData.ingredients || []));
+      // If there was an existing photo_url, we need to tell the backend not to clear it
+      if (currentMealData.photo_url) {
+        // No new file is being uploaded here, so Multer won't set req.file
+        // We need a mechanism to tell the backend to keep existing photo_url
+        // For now, if no new file is uploaded, backend keeps existing.
+        // If we want to *explicitly clear* a photo, we'd add a checkbox "Clear Photo" and send a flag.
+      }
+
+
       await authFetch(`/meals/${newlyAddedMeal.id}`, {
         method: 'PUT',
-        body: JSON.stringify({
-          // Send all other existing data to PUT, including original tags and ingredients
-          title: currentMealData.title,
-          description: currentMealData.description,
-          date_made: currentMealData.date_made,
-          photo_url: currentMealData.photo_url,
-          tags: currentMealData.tags,
-          ingredients: currentMealData.ingredients.map((ing: any) => ({
-              name: ing.name,
-              quantity: ing.quantity,
-              unit: ing.unit,
-              calories: ing.calories, // Keep existing macros if they were there
-              protein: ing.protein,
-              carbs: ing.carbs,
-              fat: ing.fat,
-          })),
-          overall_rating: rating, // Update rating
-        }),
+        body: formToUpdate, // Send FormData
       });
 
-      // 2. Potentially set an initial rank based on initial rating
       let suggestedRank: number | undefined;
-      if (rating === 5) suggestedRank = 1; // Good
-      else if (rating === 3) suggestedRank = 5; // Okay
-      // If rating is 1 (Bad), no initial rank suggested by this logic
+      if (rating === 5) suggestedRank = 1;
+      else if (rating === 3) suggestedRank = 5;
 
       if (suggestedRank !== undefined) {
           await authFetch('/rankings', {
@@ -138,7 +157,6 @@ const AddMealPage: React.FC = () => {
           });
       }
 
-      // 3. Prepare for comparison if rating is Good/Okay and other meals exist
       if (rating === 5 || rating === 3) {
         const allMeals = await authFetch('/meals');
         const comparableMeals = allMeals.filter(
@@ -149,12 +167,11 @@ const AddMealPage: React.FC = () => {
         if (comparableMeals.length > 0) {
           const randomIndex = Math.floor(Math.random() * comparableMeals.length);
           setMealToCompareWith(comparableMeals[randomIndex]);
-          setIsComparisonModalOpen(true); // Open the comparison modal
-          return; // Stop here, comparison modal will handle final navigation
+          setIsComparisonModalOpen(true);
+          return;
         }
       }
 
-      // If no comparison is needed/possible, navigate
       alert('Meal added and rated successfully!');
       navigate('/meals');
     } catch (err: any) {
@@ -165,43 +182,38 @@ const AddMealPage: React.FC = () => {
   };
 
   const handleComparisonResult = async (betterMealId: string | null) => {
-    setIsComparisonModalOpen(false); // Close comparison modal
+    setIsComparisonModalOpen(false);
     if (!newlyAddedMeal || !mealToCompareWith) {
       navigate('/meals');
       return;
     }
 
     try {
-      let targetRank: number; // Now explicitly a number
+      let targetRank: number;
 
-      // Fetch current rank of compared meal (if it's ranked)
       const rankedComparedResult = await authFetch(`/rankings?mealId=${mealToCompareWith.id}`);
-      const currentComparedRank: number | undefined = rankedComparedResult[0]?.rank_position; // This can be number | undefined
+      const currentComparedRank: number | undefined = rankedComparedResult[0]?.rank_position;
 
       if (betterMealId === newlyAddedMeal.id) {
-        // New meal is better: try to give it 1 higher rank (lower number) than compared meal, or rank 1
         if (currentComparedRank !== undefined) {
           targetRank = Math.max(1, currentComparedRank - 1);
         } else {
-          targetRank = 1; // If compared meal not ranked, new meal gets rank 1
+          targetRank = 1;
         }
       } else if (betterMealId === mealToCompareWith.id) {
-        // New meal is worse: try to give it 1 lower rank (higher number) than compared meal
         if (currentComparedRank !== undefined) {
           targetRank = currentComparedRank + 1;
         } else {
-          targetRank = 10; // If compared meal not ranked, new meal gets rank 10
+          targetRank = 10;
         }
       } else {
-        // They're equal: try to give it same rank as compared meal, or default 5
         if (currentComparedRank !== undefined) {
           targetRank = currentComparedRank;
         } else {
-          targetRank = 5; // If compared meal not ranked, new meal defaults to rank 5
+          targetRank = 5;
         }
       }
 
-      // Ensure targetRank is strictly within 1-10 range before sending to API
       targetRank = Math.min(10, Math.max(1, targetRank));
 
       await authFetch('/rankings', {
@@ -214,91 +226,99 @@ const AddMealPage: React.FC = () => {
       console.error('Error during comparison ranking:', err);
       alert('Meal added, but comparison ranking failed. Check console.');
     } finally {
-      navigate('/meals'); // Finally navigate to meals list
+      navigate('/meals');
     }
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
+    <div className="card card-md">
       <h2>Add New Meal</h2>
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Title:</label>
-          <input type="text" name="title" value={formData.title} onChange={handleChange} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        <div className="form-group">
+          <label htmlFor="title">Title:</label>
+          <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} required />
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Description:</label>
-          <textarea name="description" value={formData.description} onChange={handleChange} rows={4} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}></textarea>
+        <div className="form-group">
+          <label htmlFor="description">Description:</label>
+          <textarea id="description" name="description" value={formData.description} onChange={handleChange} rows={4}></textarea>
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Date Made:</label>
-          <input type="date" name="date_made" value={formData.date_made} onChange={handleChange} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        <div className="form-group">
+          <label htmlFor="date_made">Date Made:</label>
+          <input type="date" id="date_made" name="date_made" value={formData.date_made} onChange={handleChange} required />
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Photo URL:</label>
-          <input type="url" name="photo_url" value={formData.photo_url} onChange={handleChange} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        {/* Photo Upload Field */}
+        <div className="form-group">
+          <label htmlFor="photo">Upload Photo:</label>
+          <input type="file" id="photo" name="photo" accept="image/*" onChange={handlePhotoChange} />
+          {photoPreview && (
+            <img src={photoPreview} alt="Photo Preview" className="mt-10" style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'cover' }} />
+          )}
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Tags (comma-separated):</label>
-          <input type="text" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        <div className="form-group">
+          <label htmlFor="tags">Tags (comma-separated):</label>
+          <input type="text" id="tags" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" />
         </div>
 
-        <h3 style={{ marginTop: '30px', marginBottom: '15px' }}>Ingredients</h3>
+        <h3 className="mt-30 mb-15">Ingredients</h3>
         {ingredients.map((ingredient, index) => (
-          <div key={index} style={{ border: '1px dashed #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 0.5fr', gap: '10px', marginBottom: '10px' }}>
+          <div key={index} className="ingredient-item">
+            <div className="form-group grid-layout grid-cols-3 grid-gap-10">
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Name:</label>
+                <label htmlFor={`ingredient-name-${index}`}>Name:</label>
                 <input
                   type="text"
+                  id={`ingredient-name-${index}`}
                   name="name"
                   value={ingredient.name}
                   onChange={(e) => handleIngredientChange(index, e)}
                   placeholder="e.g., Chicken Breast"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Quantity:</label>
+                <label htmlFor={`ingredient-quantity-${index}`}>Quantity:</label>
                 <input
                   type="number"
+                  id={`ingredient-quantity-${index}`}
                   name="quantity"
                   value={ingredient.quantity}
                   onChange={(e) => handleIngredientChange(index, e)}
                   placeholder="e.g., 200"
                   step="0.01"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Unit:</label>
+                <label htmlFor={`ingredient-unit-${index}`}>Unit:</label>
                 <input
                   type="text"
+                  id={`ingredient-unit-${index}`}
                   name="unit"
                   value={ingredient.unit}
                   onChange={(e) => handleIngredientChange(index, e)}
                   placeholder="g / ml / pcs"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
                 />
               </div>
             </div>
             {ingredients.length > 1 && (
-              <button type="button" onClick={() => handleRemoveIngredient(index)} style={{ padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8em', marginTop: '10px' }}>
-                Remove Ingredient
-              </button>
+              <div className="d-flex justify-content-end mt-10">
+                <button type="button" onClick={() => handleRemoveIngredient(index)} className="btn btn-danger btn-sm">
+                  Remove Ingredient
+                </button>
+              </div>
             )}
           </div>
         ))}
-        <button type="button" onClick={handleAddIngredient} style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' }}>
-          Add Another Ingredient
-        </button>
+        <div className="d-flex justify-content-center mt-10">
+          <button type="button" onClick={handleAddIngredient} className="btn btn-secondary-muted">
+            Add Another Ingredient
+          </button>
+        </div>
 
-        {error && <p style={{ color: 'red', marginBottom: '15px', marginTop: '15px' }}>{error}</p>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-          <button type="submit" disabled={loading} style={{ padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+        {error && <p className="text-error mt-15 mb-15">{error}</p>}
+        <div className="d-flex justify-content-between mt-20">
+          <button type="submit" disabled={loading} className="btn btn-primary">
             {loading ? 'Adding...' : 'Add Meal'}
           </button>
-          <Link to="/meals" style={{ padding: '10px 20px', backgroundColor: '#6c757d', color: 'white', textDecoration: 'none', borderRadius: '4px' }}>
+          <Link to="/meals" className="btn btn-secondary-muted">
             Cancel
           </Link>
         </div>

@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useApiClient } from '../api/apiClient';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 
-// Updated Ingredient type definition - Removed macro fields
 interface IngredientFormData {
   id?: string;
   name: string;
@@ -18,11 +17,15 @@ const EditMealPage: React.FC = () => {
     title: '',
     description: '',
     date_made: '',
-    photo_url: '',
+    // photo_url handled separately
     overall_rating: 3, // Still in state for consistency, but not editable directly
     tags: '',
   });
   const [ingredients, setIngredients] = useState<IngredientFormData[]>([]);
+  const [photoFile, setPhotoFile] = useState<File | null>(null); // State for new selected file
+  const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null); // State for existing photo
+  const [clearPhoto, setClearPhoto] = useState(false); // State to explicitly clear photo
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -39,17 +42,16 @@ const EditMealPage: React.FC = () => {
           title: data.title || '',
           description: data.description || '',
           date_made: data.date_made ? new Date(data.date_made).toISOString().split('T')[0] : '',
-          photo_url: data.photo_url || '',
           overall_rating: data.overall_rating || 3,
           tags: data.tags ? data.tags.join(', ') : '',
         });
+        setCurrentPhotoUrl(data.photo_url || null);
         if (data.ingredients && data.ingredients.length > 0) {
             setIngredients(data.ingredients.map((ing: any) => ({
                 id: ing.id,
                 name: ing.name,
                 quantity: String(ing.quantity),
                 unit: ing.unit || '',
-                // Macro fields are no longer collected by frontend, but will be preserved by backend if existed
             })));
         } else {
             setIngredients([{ name: '', quantity: '', unit: '' }]);
@@ -69,6 +71,28 @@ const EditMealPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      setPhotoFile(file);
+      setCurrentPhotoUrl(URL.createObjectURL(file));
+      setClearPhoto(false);
+    } else {
+      setPhotoFile(null);
+      if (!clearPhoto) {
+        setCurrentPhotoUrl(null);
+      }
+    }
+  };
+
+  const handleClearPhoto = () => {
+    setPhotoFile(null);
+    setCurrentPhotoUrl(null);
+    setClearPhoto(true);
+    const photoInput = document.getElementById('photo-edit') as HTMLInputElement;
+    if (photoInput) photoInput.value = '';
   };
 
   const handleIngredientChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -92,24 +116,28 @@ const EditMealPage: React.FC = () => {
     setError(null);
     setLoading(true);
 
-    const mealData = {
-      ...formData,
-      overall_rating: Number(formData.overall_rating), // This value will be sent back, but not from an input
-      tags: formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag),
-      // Only send name, quantity, unit for ingredients
-      ingredients: ingredients.map(ing => ({
-        name: ing.name.trim(),
-        quantity: Number(ing.quantity) || 0,
-        unit: ing.unit.trim(),
-        // Macro fields are no longer collected by frontend, so they are omitted here.
-        // Backend will default them to null if not provided, or keep existing if they were there via the UPDATE query's ON CONFLICT.
-      })).filter(ing => ing.name && ing.quantity > 0)
-    };
+    const formToSend = new FormData();
+    formToSend.append('title', formData.title);
+    formToSend.append('description', formData.description);
+    formToSend.append('date_made', formData.date_made);
+    formToSend.append('overall_rating', String(formData.overall_rating));
+    formToSend.append('tags', JSON.stringify(formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)));
+    formToSend.append('ingredients', JSON.stringify(ingredients.map(ing => ({
+      name: ing.name.trim(),
+      quantity: Number(ing.quantity) || 0,
+      unit: ing.unit.trim(),
+    })).filter(ing => ing.name && ing.quantity > 0)));
+
+    if (photoFile) {
+      formToSend.append('photo', photoFile);
+    } else if (clearPhoto) {
+      formToSend.append('photo_url_is_null', 'true');
+    }
 
     try {
       await authFetch(`/meals/${id}`, {
         method: 'PUT',
-        body: JSON.stringify(mealData),
+        body: formToSend,
       });
       alert('Meal updated successfully!');
       navigate('/meals');
@@ -122,99 +150,111 @@ const EditMealPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading meal data...</div>;
+    return <div className="app-main-content text-center">Loading meal data...</div>;
   }
 
   if (error) {
-    return <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>Error: {error}</div>;
+    return <div className="app-main-content text-center text-error">Error: {error}</div>;
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #ccc', borderRadius: '8px' }}>
+    <div className="card card-md">
       <h2>Edit Meal</h2>
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Title:</label>
-          <input type="text" name="title" value={formData.title} onChange={handleChange} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        <div className="form-group">
+          <label htmlFor="title">Title:</label>
+          <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} required />
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Description:</label>
-          <textarea name="description" value={formData.description} onChange={handleChange} rows={4} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}></textarea>
+        <div className="form-group">
+          <label htmlFor="description">Description:</label>
+          <textarea id="description" name="description" value={formData.description} onChange={handleChange} rows={4}></textarea>
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Date Made:</label>
-          <input type="date" name="date_made" value={formData.date_made} onChange={handleChange} required style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        <div className="form-group">
+          <label htmlFor="date_made">Date Made:</label>
+          <input type="date" id="date_made" name="date_made" value={formData.date_made} onChange={handleChange} required />
         </div>
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Photo URL:</label>
-          <input type="url" name="photo_url" value={formData.photo_url} onChange={handleChange} style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        {/* Photo Upload Field for Edit */}
+        <div className="form-group">
+          <label htmlFor="photo-edit">Change Photo:</label>
+          <input type="file" id="photo-edit" name="photo" accept="image/*" onChange={handlePhotoChange} />
+          {(currentPhotoUrl && !clearPhoto) && (
+            <div className="d-flex align-items-center gap-10 mt-10">
+              <img src={currentPhotoUrl} alt="Current Photo Preview" style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'cover' }} />
+              <button type="button" onClick={handleClearPhoto} className="btn btn-danger btn-sm">Clear Photo</button>
+            </div>
+          )}
+          {(!currentPhotoUrl && clearPhoto) && (
+            <p className="text-muted mt-10" style={{fontSize: '0.85em'}}>Photo will be removed on save.</p>
+          )}
         </div>
-        {/* REMOVED: Overall Rating input field */}
-        <div style={{ marginBottom: '15px' }}>
-          <label style={{ display: 'block', marginBottom: '5px' }}>Tags (comma-separated):</label>
-          <input type="text" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }} />
+        <div className="form-group">
+          <label htmlFor="tags">Tags (comma-separated):</label>
+          <input type="text" id="tags" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" />
         </div>
 
-        <h3 style={{ marginTop: '30px', marginBottom: '15px' }}>Ingredients</h3>
+        <h3 className="mt-30 mb-15">Ingredients</h3>
         {ingredients.length === 0 && !loading && (
-          <p style={{ textAlign: 'center', color: '#777', marginBottom: '15px' }}>Click "Add Ingredient" to add your first ingredient.</p>
+          <p className="text-center text-muted mb-15">Click "Add Ingredient" to add your first ingredient.</p>
         )}
         {ingredients.map((ingredient, index) => (
-          <div key={index} style={{ border: '1px dashed #ddd', padding: '15px', marginBottom: '15px', borderRadius: '5px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 0.5fr 0.5fr', gap: '10px', marginBottom: '10px' }}>
+          <div key={index} className="ingredient-item">
+            <div className="form-group grid-layout grid-cols-3 grid-gap-10">
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Name:</label>
+                <label htmlFor={`ingredient-name-${index}`}>Name:</label>
                 <input
                   type="text"
+                  id={`ingredient-name-${index}`}
                   name="name"
                   value={ingredient.name}
                   onChange={(e) => handleIngredientChange(index, e)}
                   placeholder="e.g., Chicken Breast"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Quantity:</label>
+                <label htmlFor={`ingredient-quantity-${index}`}>Quantity:</label>
                 <input
                   type="number"
+                  id={`ingredient-quantity-${index}`}
                   name="quantity"
                   value={ingredient.quantity}
                   onChange={(e) => handleIngredientChange(index, e)}
                   placeholder="e.g., 200"
                   step="0.01"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
                 />
               </div>
               <div>
-                <label style={{ display: 'block', marginBottom: '5px' }}>Unit:</label>
+                <label htmlFor={`ingredient-unit-${index}`}>Unit:</label>
                 <input
                   type="text"
+                  id={`ingredient-unit-${index}`}
                   name="unit"
                   value={ingredient.unit}
                   onChange={(e) => handleIngredientChange(index, e)}
                   placeholder="g / ml / pcs"
-                  style={{ width: '100%', padding: '8px', boxSizing: 'border-box' }}
                 />
               </div>
             </div>
-            {/* REMOVED: Calories, Protein, Carbs, Fat fields */}
             {ingredients.length > 0 && (
-              <button type="button" onClick={() => handleRemoveIngredient(index)} style={{ padding: '5px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8em', marginTop: '10px' }}>
-                Remove Ingredient
-              </button>
+              <div className="d-flex justify-content-end mt-10">
+                <button type="button" onClick={() => handleRemoveIngredient(index)} className="btn btn-danger btn-sm">
+                  Remove Ingredient
+                </button>
+              </div>
             )}
           </div>
         ))}
-        <button type="button" onClick={handleAddIngredient} style={{ padding: '8px 15px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '10px' }}>
-          Add Another Ingredient
-        </button>
+        <div className="d-flex justify-content-center mt-10">
+          <button type="button" onClick={handleAddIngredient} className="btn btn-secondary-muted">
+            Add Another Ingredient
+          </button>
+        </div>
 
-        {error && <p style={{ color: 'red', marginBottom: '15px', marginTop: '15px' }}>{error}</p>}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '20px' }}>
-          <button type="submit" disabled={loading} style={{ padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+        {error && <p className="text-error mt-15 mb-15">{error}</p>}
+        <div className="d-flex justify-content-between mt-20">
+          <button type="submit" disabled={loading} className="btn btn-primary">
             {loading ? 'Updating...' : 'Update Meal'}
           </button>
-          <Link to="/meals" style={{ padding: '10px 20px', backgroundColor: '#6c757d', color: 'white', textDecoration: 'none', borderRadius: '4px' }}>
+          <Link to="/meals" className="btn btn-secondary-muted">
             Cancel
           </Link>
         </div>

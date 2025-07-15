@@ -1,27 +1,35 @@
 import { useAuth } from '../context/AuthContext';
-import { useCallback } from 'react'; // Import useCallback
+import { useCallback } from 'react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 export const useApiClient = () => {
   const { token, logout } = useAuth();
 
-  const authFetch = useCallback(async ( // Wrap authFetch with useCallback
+  const authFetch = useCallback(async (
     url: string,
     options: RequestInit = {}
   ) => {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string> || {}),
-    };
+    let headers: Record<string, string> = {}; // Initialize as empty object
 
+    
+    if (!(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
+
+    // Merge any additional headers provided in options
+    if (options.headers) {
+        headers = { ...headers, ...(options.headers as Record<string, string>) };
+    }
+
+    // Add Authorization header if token exists
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_BASE_URL}${url}`, {
       ...options,
-      headers,
+      headers, // Use the dynamically constructed headers object
     });
 
     if (response.status === 401 || response.status === 403) {
@@ -36,7 +44,7 @@ export const useApiClient = () => {
     }
 
     return data;
-  }, [token, logout]); // Dependencies for useCallback
+  }, [token, logout]);
 
   return { authFetch };
 };
