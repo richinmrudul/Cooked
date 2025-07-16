@@ -639,3 +639,86 @@ a:hover {
     color: rgba(255, 255, 255, 0.8); /* Slightly transparent white */
     white-space: nowrap; /* Prevent wrapping */
 }
+
+
+/* Filter Controls Specific Styles */
+.filter-controls {
+    padding: 20px; /* Adjust padding for nested card */
+    box-shadow: 0 1px 5px var(--color-shadow-light); /* Lighter shadow for nested */
+    border-radius: 10px; /* Match card border-radius */
+    background-color: #fcfcfc; /* Slightly different background to stand out */
+}
+
+.filter-controls .form-group {
+    margin-bottom: 15px; /* Adjust spacing within filters */
+    flex-basis: 150px; /* Allow flex items to grow from a base width */
+    flex-grow: 1; /* Allow them to grow */
+}
+
+/* Adjust specific input sizes within filter controls if needed */
+.filter-controls input[type="number"] {
+    max-width: 100px; /* Constrain number inputs for ratings */
+}
+
+/* Make select inputs match button height */
+.filter-controls select {
+    padding: 10px 12px; /* Slightly less padding than text inputs for better alignment */
+}
+
+
+/* Filter Controls Specific Styles */
+.filter-controls {
+    padding: 20px; /* Adjust padding for nested card */
+    box-shadow: 0 1px 5px var(--color-shadow-light); /* Lighter shadow for nested */
+    border-radius: 10px; /* Match card border-radius */
+    background-color: #fcfcfc; /* Slightly different background to stand out */
+}
+
+.filter-controls .form-group {
+    margin-bottom: 15px; /* Adjust spacing within filters */
+    flex-basis: 150px; /* Allow flex items to grow from a base width */
+    flex-grow: 1; /* Allow them to grow */
+}
+
+/* Make search input look better */
+.filter-controls input[type="text"] {
+    padding: 12px; /* Consistent padding */
+    font-size: 1em;
+    border-radius: 8px; /* Match other inputs */
+}
+
+/* Make number inputs match button height */
+.filter-controls input[type="number"] {
+    max-width: 100px; /* Constrain number inputs for ratings */
+    padding: 10px 12px; /* Less padding to align with selects */
+}
+
+/* Make select inputs match button height */
+.filter-controls select {
+    padding: 10px 12px; /* Less padding to align with number inputs */
+    border-radius: 8px; /* Match other inputs */
+}
+
+/* Hide labels visually but keep for accessibility */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+}
+
+/* Small buttons for filters */
+.btn-sm {
+    padding: 8px 15px; /* Smaller padding */
+    font-size: 0.9em; /* Smaller font */
+}
+
+/* Utility for full width in a flex row */
+.w-100 {
+    width: 100%;
+}
