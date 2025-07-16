@@ -5,7 +5,7 @@ import {
   setMealRank,
   getRankedMeals,
   deleteMealRank,
-  recordComparison 
+  recordComparison
 } from '../controllers/ranking.controller';
 
 const router = Router();
@@ -13,9 +13,9 @@ const router = Router();
 router.use(express.json({ limit: '50mb' }));
 router.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-router.post('/', auth, setMealRank); // Still used for initial manual rank, or default from add meal
+router.post('/', auth, setMealRank);
 router.get('/', auth, getRankedMeals);
 router.delete('/:mealId', auth, deleteMealRank);
-router.post('/compare', auth, recordComparison); 
+router.post('/compare', auth, recordComparison);
 
 export default router;

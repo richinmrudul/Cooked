@@ -10,26 +10,24 @@ export const useApiClient = () => {
     url: string,
     options: RequestInit = {}
   ) => {
-    let headers: Record<string, string> = {}; // Initialize as empty object
+    let headers: Record<string, string> = {};
 
-    
+    //ONLY set Content-Type to application/json IF the body is NOT FormData
     if (!(options.body instanceof FormData)) {
         headers['Content-Type'] = 'application/json';
     }
 
-    // Merge any additional headers provided in options
     if (options.headers) {
-        headers = { ...headers, ...(options.headers as Record<string, string>) };
+        Object.assign(headers, options.headers);
     }
 
-    // Add Authorization header if token exists
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
     const response = await fetch(`${API_BASE_URL}${url}`, {
       ...options,
-      headers, // Use the dynamically constructed headers object
+      headers,
     });
 
     if (response.status === 401 || response.status === 403) {

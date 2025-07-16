@@ -25,14 +25,14 @@ const AddMealPage: React.FC = () => {
     title: '',
     description: '',
     date_made: new Date().toISOString().split('T')[0],
-    overall_rating: 3, // Initial default, will be overridden by modal
+    overall_rating: 3,
     tags: '',
   });
   const [ingredients, setIngredients] = useState<IngredientFormData[]>([
     { name: '', quantity: '', unit: '' }
   ]);
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null); // NEW: State for the selected file
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null); // NEW: State for image preview
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,31 +119,28 @@ const AddMealPage: React.FC = () => {
     }
 
     try {
-      // 1. Update the meal's overall rating
       const currentMealData = await authFetch(`/meals/${newlyAddedMeal.id}`);
+
+      const formToUpdate = new FormData();
+      formToUpdate.append('title', currentMealData.title);
+      formToUpdate.append('description', currentMealData.description);
+      formToUpdate.append('date_made', currentMealData.date_made);
+      formToUpdate.append('overall_rating', String(rating));
+      formToUpdate.append('tags', JSON.stringify(currentMealData.tags || []));
+      formToUpdate.append('ingredients', JSON.stringify(currentMealData.ingredients || []));
+
+      if (currentMealData.photo_url) {
+        // Re-fetch the file if it exists and no new one is uploaded for PUT operation.
+        // This is complex for FormData. Simplest is to assume backend keeps current if no new file sent.
+      }
+
+
       await authFetch(`/meals/${newlyAddedMeal.id}`, {
         method: 'PUT',
-        body: JSON.stringify({
-          title: currentMealData.title,
-          description: currentMealData.description,
-          date_made: currentMealData.date_made,
-          photo_url: currentMealData.photo_url, // Keep current photo URL
-          tags: currentMealData.tags,
-          ingredients: currentMealData.ingredients.map((ing: any) => ({
-              name: ing.name,
-              quantity: ing.quantity,
-              unit: ing.unit,
-              calories: ing.calories,
-              protein: ing.protein,
-              carbs: ing.carbs,
-              fat: ing.fat,
-          })),
-          overall_rating: rating,
-        }),
+        body: formToUpdate,
       });
 
-      // 2. Prepare for comparison if rating is Good/Okay and other meals exist
-      // No direct rank assignment here anymore, only via comparison
+      // ELO/comparison logic
       if (rating === 5 || rating === 3) {
         const allMeals = await authFetch('/meals');
         const comparableMeals = allMeals.filter(
@@ -154,12 +151,11 @@ const AddMealPage: React.FC = () => {
         if (comparableMeals.length > 0) {
           const randomIndex = Math.floor(Math.random() * comparableMeals.length);
           setMealToCompareWith(comparableMeals[randomIndex]);
-          setIsComparisonModalOpen(true); // Open the comparison modal
-          return; // Stop here, comparison modal will handle final navigation
+          setIsComparisonModalOpen(true);
+          return;
         }
       }
 
-      // If no comparison is needed/possible, navigate
       alert('Meal added and rated successfully!');
       navigate('/meals');
     } catch (err: any) {
@@ -177,11 +173,10 @@ const AddMealPage: React.FC = () => {
     }
 
     try {
-      // Send comparison result to new backend endpoint
       const comparisonType = betterMealId === newlyAddedMeal.id ? 'win' :
                             betterMealId === mealToCompareWith.id ? 'lose' : 'tie';
 
-      await authFetch('/rankings/compare', { // NEW: Call recordComparison endpoint
+      await authFetch('/rankings/compare', {
         method: 'POST',
         body: JSON.stringify({
           winnerId: comparisonType === 'win' ? newlyAddedMeal.id : mealToCompareWith.id,
@@ -196,7 +191,7 @@ const AddMealPage: React.FC = () => {
       console.error('Error during comparison ranking:', err);
       alert('Comparison failed. Check console.');
     } finally {
-      navigate('/meals'); // Finally navigate to meals list
+      navigate('/meals');
     }
   };
 
@@ -216,6 +211,7 @@ const AddMealPage: React.FC = () => {
           <label htmlFor="date_made">Date Made:</label>
           <input type="date" id="date_made" name="date_made" value={formData.date_made} onChange={handleChange} required />
         </div>
+        {/* NEW: Photo Upload Field (instead of URL) */}
         <div className="form-group">
           <label htmlFor="photo">Upload Photo:</label>
           <input type="file" id="photo" name="photo" accept="image/*" onChange={handlePhotoChange} />
@@ -304,7 +300,7 @@ const AddMealPage: React.FC = () => {
       )}
 
       {/* Comparison Modal */}
-      {newlyAddedMeal && mealToCompareWith && (
+      {newlyAddedMeal && mealToCompareWith && ( // Assuming this is still used for comparison
         <ComparisonModal
           isOpen={isComparisonModalOpen}
           onClose={() => { setIsComparisonModalOpen(false); navigate('/meals'); }}

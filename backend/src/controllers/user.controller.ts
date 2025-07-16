@@ -4,10 +4,11 @@ import { QueryResult } from 'pg';
 import bcrypt from 'bcryptjs';
 
 async function getUserStats(userId: string) {
+    // Updated to remove macro calculation fetches, focusing on core stats
     const totalMealsResult = await pool.query('SELECT COUNT(*) AS total FROM meals WHERE user_id = $1', [userId]);
     const avgRatingResult = await pool.query('SELECT AVG(overall_rating)::numeric(10,2) AS avg_rating FROM meals WHERE user_id = $1', [userId]);
     const rankedMealsResult = await pool.query(
-        
+        // Fetches score, orders by score for top 5
         `SELECT
             r.score::numeric(10,2) AS score, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made
         FROM rankings r
@@ -23,7 +24,7 @@ async function getUserStats(userId: string) {
         averageRating: parseFloat(avgRatingResult.rows[0]?.avg_rating || '0'),
         topRankedMeals: rankedMealsResult.rows.map((row, index) => ({
             ...row,
-            score: parseFloat(row.score), // Ensure score is parsed to float
+            score: parseFloat(row.score),
             rank_position: index + 1
         })),
     };
@@ -69,6 +70,7 @@ const updateProfile = async (req: Request, res: Response) => {
         return res.status(401).json({ message: 'User not authenticated.' });
     }
 
+    // These come from req.body (parsed by express.json or multer if file upload is on)
     const { firstName, lastName, email, password, currentPassword, profilePhotoUrl, photo_url_is_null } = req.body;
 
     try {
@@ -94,8 +96,8 @@ const updateProfile = async (req: Request, res: Response) => {
             newPasswordHash = await bcrypt.hash(password, 10);
         }
 
-        let newProfilePhotoUrl: string | null = profilePhotoUrl;
-        if (photo_url_is_null === true) {
+        let newProfilePhotoUrl: string | null = profilePhotoUrl; // Assumed to be URL from frontend
+        if (photo_url_is_null === true || photo_url_is_null === 'true') { // Handle boolean or string 'true'
             newProfilePhotoUrl = null;
         }
 

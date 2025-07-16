@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'; // Import useCallback
+import React, { useState, useEffect, useCallback } from 'react';
 import { useApiClient } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
@@ -17,6 +17,11 @@ interface Meal {
     quantity: number;
     unit?: string;
   }>;
+  // Whole-meal macros
+  calories?: number | null;
+  protein?: number | null;
+  carbs?: number | null;
+  fat?: number | null;
 }
 
 const MealsPage: React.FC = () => {
@@ -38,7 +43,19 @@ const MealsPage: React.FC = () => {
   // State to control filter section visibility
   const [showFilters, setShowFilters] = useState(false);
 
-  // Memoize fetchMeals to avoid unnecessary re-creations and issues with useEffect dependencies
+  const fetchAllTags = useCallback(async () => { // Make this useCallback too
+      try {
+        const data = await authFetch('/meals');
+        const tagsSet = new Set<string>();
+        data.forEach((meal: Meal) => {
+          meal.tags?.forEach(tag => tagsSet.add(tag));
+        });
+        setAllTags(Array.from(tagsSet).sort());
+      } catch (err) {
+        console.error('Error fetching all tags:', err);
+      }
+  }, [authFetch]); // Dependencies
+
   const fetchMeals = useCallback(async () => {
     try {
       setLoading(true);
@@ -61,29 +78,15 @@ const MealsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, authFetch, searchQuery, selectedTag, minRating, maxRating, startDate, endDate]); // Dependencies are still needed for fetchMeals itself
+  }, [authFetch, searchQuery, selectedTag, minRating, maxRating, startDate, endDate]);
 
 
-  // Fetch all unique tags for filter dropdown (runs once on user login)
   useEffect(() => {
-    const fetchAllTags = async () => {
-      try {
-        // This fetch should get ALL meals to correctly populate filter options, not filtered ones
-        const data = await authFetch('/meals');
-        const tagsSet = new Set<string>();
-        data.forEach((meal: Meal) => {
-          meal.tags?.forEach(tag => tagsSet.add(tag));
-        });
-        setAllTags(Array.from(tagsSet).sort());
-      } catch (err) {
-        console.error('Error fetching all tags:', err);
-      }
-    };
     if (user) {
       fetchAllTags();
-      fetchMeals(); // Initial fetch of meals when page loads or user logs in
+      fetchMeals();
     }
-  }, [user, authFetch]); // ONLY run this effect when user or authFetch changes
+  }, [user, fetchAllTags, fetchMeals]); // Add fetchAllTags to dependencies
 
 
   const handleClearFilters = () => {
@@ -94,8 +97,6 @@ const MealsPage: React.FC = () => {
     setStartDate('');
     setEndDate('');
     setShowFilters(false);
-    // Do not call fetchMeals here. The effect above handles initial load.
-    // It will be re-triggered by the 'Search' button click which calls fetchMeals.
   };
 
   const handleDelete = async (mealId: string) => {
@@ -117,7 +118,6 @@ const MealsPage: React.FC = () => {
     return <div className="app-main-content text-center">Loading meals...</div>;
   }
 
-  // No error will be applied to meal-card
   if (error) {
     return <div className="app-main-content text-center text-error">Error: {error}</div>;
   }
@@ -155,7 +155,7 @@ const MealsPage: React.FC = () => {
             <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary-muted btn-sm">
                 {showFilters ? 'Hide Filters' : 'Show Filters'}
             </button>
-            <button onClick={fetchMeals} className="btn btn-primary btn-sm">Search</button> {/* This button now explicitly triggers fetchMeals */}
+            <button onClick={fetchMeals} className="btn btn-primary btn-sm">Search</button>
         </div>
 
         {showFilters && (
@@ -199,7 +199,7 @@ const MealsPage: React.FC = () => {
       ) : (
         <div className="grid-layout grid-cols-2 grid-gap-20">
           {meals.map((meal) => (
-            <div key={meal.id} className="meal-card"> {/* This div should not be red unless explicitly given a class */}
+            <div key={meal.id} className="meal-card">
               {meal.photo_url && (
                 <img src={meal.photo_url} alt={meal.title} className="meal-card-image" />
               )}
@@ -222,6 +222,18 @@ const MealsPage: React.FC = () => {
                         </ul>
                     </div>
                 )}
+                {/* Display Macros */}
+                {(meal.calories || meal.protein || meal.carbs || meal.fat) ? (
+                    <div className="meal-card-macros mt-10">
+                        <h4 style={{fontSize: '1em', marginBottom: '5px', color: 'var(--color-text)'}}>Nutrition:</h4>
+                        <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9em', color: 'var(--color-secondary-text)', display: 'flex', flexWrap: 'wrap', gap: '5px 10px'}}>
+                            {meal.calories && <li>Calories: {meal.calories}kcal</li>}
+                            {meal.protein && <li>Protein: {meal.protein}g</li>}
+                            {meal.carbs && <li>Carbs: {meal.carbs}g</li>}
+                            {meal.fat && <li>Fat: {meal.fat}g</li>}
+                        </ul>
+                    </div>
+                ) : null}
                 <div className="meal-card-actions">
                   <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm">
                     Edit

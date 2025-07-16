@@ -15,6 +15,7 @@ async function updateEloScores(userId: string, winnerId: string, loserId: string
         let winnerScore = parseFloat(winnerRankResult.rows[0]?.score || 1500);
         let loserScore = parseFloat(loserRankResult.rows[0]?.score || 1500);
 
+        // Create entries in rankings table if meals are not yet ranked (so they have a score to update)
         await client.query(
             `INSERT INTO rankings (user_id, meal_id, score) VALUES ($1, $2, $3) ON CONFLICT (user_id, meal_id) DO NOTHING`,
             [userId, winnerId, winnerScore]
@@ -69,8 +70,7 @@ const setMealRank = async (req: Request, res: Response) => {
       [mealId, userId]
     );
 
-    
-    if (!mealCheck || mealCheck.rowCount! < 2) { // Changed to !mealCheck || mealCheck.rowCount! < 2
+    if (!mealCheck || mealCheck.rowCount! < 2) {
         await pool.query('ROLLBACK');
         return res.status(404).json({ message: 'Meal not found or not authorized.' });
     }
@@ -118,7 +118,7 @@ const getRankedMeals = async (req: Request, res: Response) => {
        LEFT JOIN meal_tags mt ON m.id = mt.meal_id
        WHERE r.user_id = $1
        GROUP BY r.score, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made
-       ORDER BY r.score DESC`,
+       ORDER BY r.score DESC`, // Order by score DESC for ranking
       [userId]
     );
 
@@ -160,7 +160,7 @@ const deleteMealRank = async (req: Request, res: Response) => {
 
   } catch (error: unknown) {
       console.error('Error deleting meal rank:', error);
-      res.status(500).json({ message: 'Server error deleting meal.' });
+      res.status(500).json({ message: 'Server error deleting meal rank.' });
   }
 };
 
@@ -168,12 +168,8 @@ const recordComparison = async (req: Request, res: Response) => {
     const { winnerId, loserId, type } = req.body;
     const userId = req.user?.id;
 
-    if (!userId) {
-        return res.status(401).json({ message: 'User not authenticated.' });
-    }
-    if (!winnerId || !loserId || !['win', 'lose', 'tie'].includes(type)) {
-        return res.status(400).json({ message: 'Winner ID, Loser ID, and valid type (win/lose/tie) are required.' });
-    }
+    if (!userId) { return res.status(401).json({ message: 'User not authenticated.' }); }
+    if (!winnerId || !loserId || !['win', 'lose', 'tie'].includes(type)) { return res.status(400).json({ message: 'Winner ID, Loser ID, and valid type (win/lose/tie) are required.' }); }
 
     try {
         const mealCheck: QueryResult = await pool.query(
@@ -181,10 +177,11 @@ const recordComparison = async (req: Request, res: Response) => {
             [winnerId, userId, loserId]
         );
 
-        if (!mealCheck || mealCheck.rowCount! < 2) { 
+        if (!mealCheck || mealCheck.rowCount! < 2) {
             return res.status(404).json({ message: 'One or both meals not found or not authorized for this user.' });
         }
 
+        // Create entries in rankings table if meals are not yet ranked (so they have a score to update)
         await pool.query(
             `INSERT INTO rankings (user_id, meal_id, score) VALUES ($1, $2, $3) ON CONFLICT (user_id, meal_id) DO NOTHING`,
             [userId, winnerId, K_FACTOR]

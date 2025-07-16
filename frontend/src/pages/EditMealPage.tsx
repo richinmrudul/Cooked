@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useApiClient } from '../api/apiClient';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 
+// FIX: Quantity should be string in form data
 interface IngredientFormData {
   id?: string;
   name: string;
-  quantity: string;
+  quantity: string; // Changed to string
   unit: string;
 }
 
@@ -17,14 +18,14 @@ const EditMealPage: React.FC = () => {
     title: '',
     description: '',
     date_made: '',
-    // photo_url handled separately
-    overall_rating: 3, // Still in state for consistency, but not editable directly
+    overall_rating: 3,
     tags: '',
   });
+  // Corrected initial state for ingredients
   const [ingredients, setIngredients] = useState<IngredientFormData[]>([]);
-  const [photoFile, setPhotoFile] = useState<File | null>(null); // State for new selected file
-  const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null); // State for existing photo
-  const [clearPhoto, setClearPhoto] = useState(false); // State to explicitly clear photo
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [currentPhotoUrl, setCurrentPhotoUrl] = useState<string | null>(null);
+  const [clearPhoto, setClearPhoto] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,12 +51,13 @@ const EditMealPage: React.FC = () => {
             setIngredients(data.ingredients.map((ing: any) => ({
                 id: ing.id,
                 name: ing.name,
-                quantity: String(ing.quantity),
+                quantity: String(ing.quantity), // Convert to string for form
                 unit: ing.unit || '',
             })));
         } else {
-            setIngredients([{ name: '', quantity: '', unit: '' }]);
+            setIngredients([{ name: '', quantity: '', unit: '' }]); // Initialize with empty ingredient
         }
+
       } catch (err: any) {
         setError(err.message || 'Failed to fetch meal for editing.');
         console.error('Error fetching meal for edit:', err);
@@ -98,7 +100,7 @@ const EditMealPage: React.FC = () => {
   const handleIngredientChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const newIngredients = [...ingredients];
-    (newIngredients[index] as any)[name] = value;
+    (newIngredients[index] as any)[name] = value; // value is string
     setIngredients(newIngredients);
   };
 
@@ -122,11 +124,12 @@ const EditMealPage: React.FC = () => {
     formToSend.append('date_made', formData.date_made);
     formToSend.append('overall_rating', String(formData.overall_rating));
     formToSend.append('tags', JSON.stringify(formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)));
+    // FIX: Convert quantity to number for backend submission
     formToSend.append('ingredients', JSON.stringify(ingredients.map(ing => ({
       name: ing.name.trim(),
-      quantity: Number(ing.quantity) || 0,
+      quantity: Number(ing.quantity) || 0, // Convert to number here
       unit: ing.unit.trim(),
-    })).filter(ing => ing.name && ing.quantity > 0)));
+    })).filter(ing => ing.name && Number(ing.quantity) > 0))); // Filter based on numerical quantity
 
     if (photoFile) {
       formToSend.append('photo', photoFile);
@@ -173,18 +176,18 @@ const EditMealPage: React.FC = () => {
           <label htmlFor="date_made">Date Made:</label>
           <input type="date" id="date_made" name="date_made" value={formData.date_made} onChange={handleChange} required />
         </div>
-        {/* Photo Upload Field for Edit */}
+        {/* Photo Upload Field for Edit (instead of URL) */}
         <div className="form-group">
           <label htmlFor="photo-edit">Change Photo:</label>
           <input type="file" id="photo-edit" name="photo" accept="image/*" onChange={handlePhotoChange} />
           {(currentPhotoUrl && !clearPhoto) && (
             <div className="d-flex align-items-center gap-10 mt-10">
-              <img src={currentPhotoUrl} alt="Current Photo Preview" style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'cover' }} />
+              <img src={currentPhotoUrl} alt="Current Photo Preview" className="profile-avatar-preview" style={{ width: '80px', height: '80px', borderRadius: '4px', objectFit: 'cover' }} />
               <button type="button" onClick={handleClearPhoto} className="btn btn-danger btn-sm">Clear Photo</button>
             </div>
           )}
           {(!currentPhotoUrl && clearPhoto) && (
-            <p className="text-muted mt-10" style={{fontSize: '0.85em'}}>Photo will be removed on save.</p>
+            <p className="text-muted mt-10" style={{ fontSize: '0.85em' }}>Photo will be removed on save.</p>
           )}
         </div>
         <div className="form-group">
