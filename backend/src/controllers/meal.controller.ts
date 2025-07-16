@@ -31,13 +31,33 @@ const createMeal = async (req: Request, res: Response) => {
   console.log('req.body:', req.body);
   console.log('req.file:', req.file);
 
-  // Safely parse tags and ingredients from JSON strings
+  // Safely parse tags and ingredients from JSON strings or handle empty/null
   const title = req.body.title;
   const description = req.body.description;
   const date_made = req.body.date_made;
-  const overall_rating = parseInt(req.body.overall_rating); // Parse to number
-  const tags = req.body.tags ? JSON.parse(req.body.tags) : []; // Parse tags string to array
-  const ingredients = req.body.ingredients ? JSON.parse(req.body.ingredients) : []; // Parse ingredients string to array
+  const overall_rating = parseInt(req.body.overall_rating);
+
+  // FIX: Robustly parse tags and ingredients
+  let tags: string[] = [];
+  if (typeof req.body.tags === 'string' && req.body.tags.trim() !== '') {
+      try {
+          tags = JSON.parse(req.body.tags);
+      } catch (e) {
+          console.error("Failed to parse tags JSON string:", req.body.tags, e);
+          return res.status(400).json({ message: "Invalid tags format." });
+      }
+  }
+
+  let ingredients: IngredientInput[] = [];
+  if (typeof req.body.ingredients === 'string' && req.body.ingredients.trim() !== '') {
+      try {
+          ingredients = JSON.parse(req.body.ingredients);
+      } catch (e) {
+          console.error("Failed to parse ingredients JSON string:", req.body.ingredients, e);
+          return res.status(400).json({ message: "Invalid ingredients format." });
+      }
+  }
+
 
   const userId = req.user?.id;
   const photoFile = req.file;
@@ -184,10 +204,29 @@ const getMealById = async (req: Request, res: Response) => {
       const title = req.body.title;
       const description = req.body.description;
       const date_made = req.body.date_made;
-      const overall_rating = parseInt(req.body.overall_rating); // Parse to number
-      const tags = req.body.tags ? JSON.parse(req.body.tags) : []; // Parse tags string to array
-      const ingredients = req.body.ingredients ? JSON.parse(req.body.ingredients) : []; // Parse ingredients string to array
+      const overall_rating = parseInt(req.body.overall_rating);
       const photo_url_is_null = req.body.photo_url_is_null; // Multer sends this as a string 'true' or 'false'
+
+      // FIX: Robustly parse tags and ingredients
+      let tags: string[] = [];
+      if (typeof req.body.tags === 'string' && req.body.tags.trim() !== '') {
+          try {
+              tags = JSON.parse(req.body.tags);
+          } catch (e) {
+              console.error("Failed to parse tags JSON string:", req.body.tags, e);
+              return res.status(400).json({ message: "Invalid tags format." });
+          }
+      }
+
+      let ingredients: IngredientInput[] = [];
+      if (typeof req.body.ingredients === 'string' && req.body.ingredients.trim() !== '') {
+          try {
+              ingredients = JSON.parse(req.body.ingredients);
+          } catch (e) {
+              console.error("Failed to parse ingredients JSON string:", req.body.ingredients, e);
+              return res.status(400).json({ message: "Invalid ingredients format." });
+          }
+      }
 
       const userId = req.user?.id;
       const photoFile = req.file;
@@ -198,7 +237,7 @@ const getMealById = async (req: Request, res: Response) => {
       let photo_url_to_save: string | null = currentPhotoUrl;
       if (photoFile) {
         photo_url_to_save = `http://localhost:${process.env.PORT || 5000}/uploads/${photoFile.filename}`;
-      } else if (photo_url_is_null === 'true') { // Check string 'true'
+      } else if (photo_url_is_null === 'true') {
         photo_url_to_save = null;
       }
 
@@ -303,4 +342,4 @@ const getMealById = async (req: Request, res: Response) => {
       updateMeal,
       deleteMeal
     };
-   
+    

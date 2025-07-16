@@ -3,6 +3,7 @@ import { useApiClient } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 
+// Updated UserProfile interface for topRankedMeals
 interface UserProfile {
   id: string;
   firstName: string;
@@ -17,9 +18,10 @@ interface UserProfile {
       id: string;
       title: string;
       photo_url?: string;
-      overall_rating: number;
-      rank_position: number;
+      overall_rating: number; // Keep this in the interface
+      rank_position: number; // This will now be dynamically assigned index + 1
       date_made: string;
+      score: number; 
     }>;
   };
 }
@@ -41,12 +43,8 @@ const ProfilePage: React.FC = () => {
     email: '',
     password: '',
     currentPassword: '',
-    // Removed profilePhotoUrl from here, handled by file state
+    profilePhotoUrl: '',
   });
-  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null); // NEW: State for uploaded file
-  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null); // NEW: State for current/new photo URL for preview
-  const [clearProfilePhoto, setClearProfilePhoto] = useState(false); // NEW: State to explicitly clear photo
-
   const [submitting, setSubmitting] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
@@ -67,9 +65,10 @@ const ProfilePage: React.FC = () => {
           email: data.email || '',
           password: '',
           currentPassword: '',
+          profilePhotoUrl: data.profilePhotoUrl || '',
         });
-        setProfilePhotoPreview(data.profilePhotoUrl || null); // Set initial preview URL
-      } catch (err: any) {
+      }
+      catch (err: any) {
         setError(err.message || 'Failed to fetch profile.');
         console.error('Error fetching profile:', err);
       } finally {
@@ -85,71 +84,38 @@ const ProfilePage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleProfilePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setProfilePhotoFile(file);
-      setProfilePhotoPreview(URL.createObjectURL(file)); // Show URL of new file as preview
-      setClearProfilePhoto(false); // If new file selected, don't clear
-    } else {
-      setProfilePhotoFile(null);
-      // Only clear preview if no new file selected AND we're not explicitly clearing an existing one
-      if (!clearProfilePhoto) {
-        setProfilePhotoPreview(null);
-      }
-    }
-  };
-
-  const handleClearProfilePhoto = () => {
-    setProfilePhotoFile(null); // Clear any newly selected file
-    setProfilePhotoPreview(null); // Clear the preview
-    setClearProfilePhoto(true); // Set flag to tell backend to clear existing photo
-    const photoInput = document.getElementById('profile-photo-upload') as HTMLInputElement;
-    if (photoInput) photoInput.value = ''; // Clear file input field
-  };
-
-
   const handleProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
     setUpdateError(null);
 
-    const formToSend = new FormData();
-    formToSend.append('firstName', formData.firstName);
-    formToSend.append('lastName', formData.lastName);
-    formToSend.append('email', formData.email);
-    if (formData.password) {
-      formToSend.append('password', formData.password);
-      formToSend.append('currentPassword', formData.currentPassword);
-    }
-
-    // Handle profile photo file or clear flag
-    if (profilePhotoFile) {
-      formToSend.append('profilePhoto', profilePhotoFile); // 'profilePhoto' matches backend upload.single
-    } else if (clearProfilePhoto) {
-      formToSend.append('photo_url_is_null', 'true'); // Send flag to backend
-    }
-    // If neither, backend will retain existing photo_url
+    const dataToSend = {
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      password: formData.password,
+      currentPassword: formData.currentPassword,
+      profilePhotoUrl: formData.profilePhotoUrl,
+      photo_url_is_null: formData.profilePhotoUrl === '' ? true : false,
+    };
 
     try {
       const response = await authFetch('/user/profile', {
         method: 'PUT',
-        body: formToSend, // Send FormData
+        body: JSON.stringify(dataToSend),
       });
 
-      // Update AuthContext user state immediately for header display
       if (user) {
           const updatedUserInContext = { ...user, firstName: response.user.first_name, lastName: response.user.last_name, email: response.user.email, profilePhotoUrl: response.user.profile_photo_url };
           localStorage.setItem('user', JSON.stringify(updatedUserInContext));
-          // In a real app, you might re-dispatch user to AuthContext provider's state
       }
 
       setProfile(prev => ({
         ...(prev as UserProfile),
-        ...response.user, // Use updated user data from backend response
-        profilePhotoUrl: response.user.profilePhotoUrl // Ensure photo URL is updated from response
+        ...response.user,
+        profilePhotoUrl: response.user.profilePhotoUrl
       }));
-      setEditMode(false); // Exit edit mode
+      setEditMode(false);
       alert('Profile updated successfully!');
     } catch (err: any) {
       setUpdateError(err.message || 'Failed to update profile.');
@@ -218,10 +184,12 @@ const ProfilePage: React.FC = () => {
                 <div className="d-flex flex-column gap-15">
                     {profile.stats.topRankedMeals.map((meal) => (
                         <div key={meal.id} className="ranked-meal-item">
-                            <div className="rank-indicator">{meal.rank_position}</div>
-                            {meal.photo_url && <img src={meal.photo_url} alt={meal.title} className="ranked-meal-image" />}
+                            <div className="rank-indicator">{meal.rank_position}</div> {/* Display Rank */}
+                            {meal.photo_url && <img src={meal.photo_url} alt={meal.title} className="ranked-meal-image" />} {/* Display Photo */}
                             <div className="ranked-meal-details">
                                 <h4 className="ranked-meal-title">{meal.title}</h4>
+                                {/* Display score as a decimal number */}
+                                <p className="ranked-meal-score text-muted">Score: {meal.score.toFixed(2)}</p>
                                 <p className="ranked-meal-date">Made: {new Date(meal.date_made).toLocaleDateString()}</p>
                             </div>
                             <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm">Edit</Link>
@@ -258,19 +226,13 @@ const ProfilePage: React.FC = () => {
                         <input type="password" id="currentPassword" name="currentPassword" value={formData.currentPassword} onChange={handleFormChange} required />
                     </div>
                 )}
-                {/* Reverted to file input for profile photo */}
                 <div className="form-group">
-                    <label htmlFor="profile-photo-upload">Profile Photo:</label>
-                    <input type="file" id="profile-photo-upload" name="profilePhoto" accept="image/*" onChange={handleProfilePhotoChange} />
-                    {(profilePhotoPreview && !clearProfilePhoto) && (
-                        <div className="d-flex align-items-center gap-10 mt-10">
-                            <img src={profilePhotoPreview} alt="Profile Photo Preview" className="profile-avatar-preview"/>
-                            <button type="button" onClick={handleClearProfilePhoto} className="btn btn-danger btn-sm">Clear Photo</button>
-                        </div>
+                    <label htmlFor="profilePhotoUrl">Profile Photo URL:</label>
+                    <input type="url" id="profilePhotoUrl" name="profilePhotoUrl" value={formData.profilePhotoUrl} onChange={handleFormChange} placeholder="Enter URL for profile picture" />
+                    {formData.profilePhotoUrl && (
+                        <img src={formData.profilePhotoUrl} alt="Profile Preview" className="profile-avatar-preview mt-10"/>
                     )}
-                    {(!profilePhotoPreview && clearProfilePhoto) && (
-                        <p className="text-muted mt-10" style={{fontSize: '0.85em'}}>Photo will be removed on save.</p>
-                    )}
+                    <button type="button" onClick={() => setFormData(prev => ({...prev, profilePhotoUrl: ''}))} className="btn btn-danger btn-sm mt-10">Clear Photo URL</button>
                 </div>
                 {updateError && <p className="text-error mb-15">{updateError}</p>}
                 <div className="d-flex justify-content-end mt-20">

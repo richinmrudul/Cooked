@@ -7,12 +7,13 @@ async function getUserStats(userId: string) {
     const totalMealsResult = await pool.query('SELECT COUNT(*) AS total FROM meals WHERE user_id = $1', [userId]);
     const avgRatingResult = await pool.query('SELECT AVG(overall_rating)::numeric(10,2) AS avg_rating FROM meals WHERE user_id = $1', [userId]);
     const rankedMealsResult = await pool.query(
+        
         `SELECT
-            r.rank_position, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made
+            r.score::numeric(10,2) AS score, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made
         FROM rankings r
         JOIN meals m ON r.meal_id = m.id
         WHERE r.user_id = $1
-        ORDER BY r.rank_position ASC
+        ORDER BY r.score DESC
         LIMIT 5`,
         [userId]
     );
@@ -20,7 +21,11 @@ async function getUserStats(userId: string) {
     return {
         totalMeals: parseInt(totalMealsResult.rows[0]?.total || '0'),
         averageRating: parseFloat(avgRatingResult.rows[0]?.avg_rating || '0'),
-        topRankedMeals: rankedMealsResult.rows,
+        topRankedMeals: rankedMealsResult.rows.map((row, index) => ({
+            ...row,
+            score: parseFloat(row.score), // Ensure score is parsed to float
+            rank_position: index + 1
+        })),
     };
 }
 
@@ -64,15 +69,13 @@ const updateProfile = async (req: Request, res: Response) => {
         return res.status(401).json({ message: 'User not authenticated.' });
     }
 
-    
-    const { firstName, lastName, email, password, currentPassword, photo_url_is_null } = req.body;
-    const profilePhotoFile = req.file; // This holds the uploaded file
+    const { firstName, lastName, email, password, currentPassword, profilePhotoUrl, photo_url_is_null } = req.body;
 
     try {
         await pool.query('BEGIN');
 
         const userResult: QueryResult = await pool.query(
-            'SELECT password_hash, profile_photo_url FROM users WHERE id = $1',
+            'SELECT password_hash FROM users WHERE id = $1',
             [userId]
         );
         const user = userResult.rows[0];
@@ -91,14 +94,10 @@ const updateProfile = async (req: Request, res: Response) => {
             newPasswordHash = await bcrypt.hash(password, 10);
         }
 
-        let newProfilePhotoUrl: string | null = user.profile_photo_url; // Default to current URL from DB
-        if (profilePhotoFile) {
-            // If a new file is uploaded, use its path
-            newProfilePhotoUrl = `http://localhost:${process.env.PORT || 5000}/uploads/${profilePhotoFile.filename}`;
-        } else if (photo_url_is_null === 'true') { // Flag sent from frontend to explicitly clear photo
+        let newProfilePhotoUrl: string | null = profilePhotoUrl;
+        if (photo_url_is_null === true) {
             newProfilePhotoUrl = null;
         }
-        // If no new file and photo_url_is_null is not 'true', newProfilePhotoUrl remains the existing one
 
         const updateResult: QueryResult = await pool.query(
             `UPDATE users
@@ -115,7 +114,7 @@ const updateProfile = async (req: Request, res: Response) => {
         await pool.query('ROLLBACK');
         console.error('Error updating user profile:', error);
         if (typeof error === 'object' && error !== null && 'code' in error && typeof (error as any).code === 'string') {
-            if ((error as any).code === '23505') { // Unique violation for email
+            if ((error as any).code === '23505') {
                 return res.status(409).json({ message: 'Email already in use.' });
             }
         }

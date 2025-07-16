@@ -9,9 +9,10 @@ interface RankedMeal {
   description?: string;
   date_made: string;
   photo_url?: string;
-  overall_rating: number; // Keep this in the interface, just not displaying it
+  overall_rating: number;
   tags?: string[];
   rank_position: number;
+  score: number; // Keep score as number in interface
 }
 
 const RankingsPage: React.FC = () => {
@@ -25,7 +26,12 @@ const RankingsPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await authFetch('/rankings');
-      setRankedMeals(data);
+      // FIX: Map over the data and parse score to a number
+      const parsedData = data.map((meal: any) => ({
+          ...meal,
+          score: parseFloat(meal.score) // Convert score string to number
+      }));
+      setRankedMeals(parsedData); // Set the parsed data
     } catch (err: any) {
       setError(err.message || 'Failed to fetch ranked meals.');
       console.error('Error fetching ranked meals:', err);
@@ -55,58 +61,45 @@ const RankingsPage: React.FC = () => {
   };
 
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: '50px' }}>Loading rankings...</div>;
+    return <div className="app-main-content text-center">Loading rankings...</div>;
   }
 
   if (error) {
-    return <div style={{ textAlign: 'center', padding: '50px', color: 'red' }}>Error: {error}</div>;
+    return <div className="app-main-content text-center text-error">Error: {error}</div>;
   }
 
   return (
-    <div style={{ padding: '20px', maxWidth: '800px', margin: '50px auto', border: '1px solid #eee', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+    <div className="card card-lg">
+      <div className="d-flex justify-content-between align-items-center mb-20">
         <h2>Your Top Meals</h2>
-        <div>
-          <Link to="/meals" style={{ padding: '8px 15px', backgroundColor: '#007bff', color: 'white', textDecoration: 'none', borderRadius: '4px', marginRight: '10px' }}>
+        <div className="d-flex gap-10">
+          <Link to="/meals" className="btn btn-secondary-muted">
             View All Meals
           </Link>
-          <button
-            onClick={logout}
-            style={{ padding: '8px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Logout
-          </button>
+          <button onClick={logout} className="btn btn-danger">Logout</button>
         </div>
       </div>
 
       {rankedMeals.length === 0 ? (
-        <p style={{ textAlign: 'center', fontSize: '1.2em', color: '#555' }}>No meals ranked yet! Add a meal and rate it "Good" or "Okay" to start your rankings.</p>
+        <p className="text-muted text-center p-20">No meals ranked yet! Add a meal and rate it "Good" or "Okay" to start your rankings.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <div className="d-flex flex-column gap-15">
           {rankedMeals.map((meal) => (
-            <div key={meal.id} style={{ display: 'flex', alignItems: 'center', border: '1px solid #ddd', borderRadius: '8px', padding: '15px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-              <div style={{ flexShrink: 0, width: '40px', height: '40px', backgroundColor: '#007bff', color: 'white', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontSize: '1.2em', fontWeight: 'bold', marginRight: '15px' }}>
+            <div key={meal.id} className="ranked-meal-item">
+              <div className="rank-indicator">
                 {meal.rank_position}
+                <span className="ranked-meal-score-display">{meal.score.toFixed(0)}</span>
               </div>
               {meal.photo_url && (
-                <img src={meal.photo_url} alt={meal.title} style={{ width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px', marginRight: '15px' }} />
+                <img src={meal.photo_url} alt={meal.title} className="ranked-meal-image" />
               )}
-              <div style={{ flexGrow: 1 }}>
-                <h3 style={{ margin: '0 0 5px 0', color: '#333' }}>{meal.title}</h3>
-                <p style={{ fontSize: '0.9em', color: '#666', margin: '0' }}>
-                  Made: {new Date(meal.date_made).toLocaleDateString()} {/* REMOVED: | Rated: {meal.overall_rating}/5 */}
-                </p>
+              <div className="ranked-meal-details">
+                <h3 className="ranked-meal-title">{meal.title}</h3>
+                <p className="ranked-meal-date">Made: {new Date(meal.date_made).toLocaleDateString()}</p>
               </div>
-              <div style={{ flexShrink: 0, display: 'flex', gap: '10px', marginLeft: '15px' }}>
-                <Link to={`/meals/edit/${meal.id}`} style={{ padding: '6px 12px', backgroundColor: '#ffc107', color: '#333', textDecoration: 'none', borderRadius: '4px', fontSize: '0.9em' }}>
-                  Edit Meal
-                </Link>
-                <button
-                  onClick={() => handleDeleteRank(meal.id)}
-                  style={{ padding: '6px 12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9em' }}
-                >
-                  Remove Rank
-                </button>
+              <div className="ranked-meal-actions">
+                <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm">Edit Meal</Link>
+                <button onClick={() => handleDeleteRank(meal.id)} className="btn btn-danger btn-sm">Remove Rank</button>
               </div>
             </div>
           ))}

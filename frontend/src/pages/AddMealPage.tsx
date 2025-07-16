@@ -25,14 +25,14 @@ const AddMealPage: React.FC = () => {
     title: '',
     description: '',
     date_made: new Date().toISOString().split('T')[0],
-    overall_rating: 3,
+    overall_rating: 3, // Initial default, will be overridden by modal
     tags: '',
   });
   const [ingredients, setIngredients] = useState<IngredientFormData[]>([
     { name: '', quantity: '', unit: '' }
   ]);
-  const [photoFile, setPhotoFile] = useState<File | null>(null); // State for the selected file
-  const [photoPreview, setPhotoPreview] = useState<string | null>(null); // State for image preview
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +52,7 @@ const AddMealPage: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setPhotoFile(file);
-      setPhotoPreview(URL.createObjectURL(file)); // Create a URL for preview
+      setPhotoPreview(URL.createObjectURL(file));
     } else {
       setPhotoFile(null);
       setPhotoPreview(null);
@@ -81,28 +81,25 @@ const AddMealPage: React.FC = () => {
     setLoading(true);
 
     const formToSend = new FormData();
-    // Append all form data fields
     formToSend.append('title', formData.title);
     formToSend.append('description', formData.description);
     formToSend.append('date_made', formData.date_made);
-    formToSend.append('overall_rating', String(formData.overall_rating)); // Convert number to string
-    formToSend.append('tags', JSON.stringify(formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag))); // Send tags as JSON string
-    formToSend.append('ingredients', JSON.stringify(ingredients.map(ing => ({ // Send ingredients as JSON string
+    formToSend.append('overall_rating', String(formData.overall_rating));
+    formToSend.append('tags', JSON.stringify(formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)));
+    formToSend.append('ingredients', JSON.stringify(ingredients.map(ing => ({
       name: ing.name.trim(),
       quantity: Number(ing.quantity) || 0,
       unit: ing.unit.trim(),
     })).filter(ing => ing.name && ing.quantity > 0)));
 
-    // Append the file if selected
     if (photoFile) {
-      formToSend.append('photo', photoFile); // 'photo' matches the fieldname in Multer config
+      formToSend.append('photo', photoFile);
     }
 
     try {
       const response = await authFetch('/meals', {
         method: 'POST',
-        body: formToSend, // Send FormData as body
-        // Headers: Content-Type is NOT explicitly set, browser will set multipart/form-data
+        body: formToSend,
       });
       setNewlyAddedMeal({ id: response.meal.id, title: response.meal.title, photo_url: response.meal.photo_url });
       setIsRatingModalOpen(true);
@@ -122,41 +119,31 @@ const AddMealPage: React.FC = () => {
     }
 
     try {
-      // Need to fetch current meal data to get all existing fields (including tags/ingredients)
+      // 1. Update the meal's overall rating
       const currentMealData = await authFetch(`/meals/${newlyAddedMeal.id}`);
-
-      const formToUpdate = new FormData();
-      formToUpdate.append('title', currentMealData.title);
-      formToUpdate.append('description', currentMealData.description);
-      formToUpdate.append('date_made', currentMealData.date_made);
-      formToUpdate.append('overall_rating', String(rating)); // Updated rating
-      formToUpdate.append('tags', JSON.stringify(currentMealData.tags || []));
-      formToUpdate.append('ingredients', JSON.stringify(currentMealData.ingredients || []));
-      // If there was an existing photo_url, we need to tell the backend not to clear it
-      if (currentMealData.photo_url) {
-        // No new file is being uploaded here, so Multer won't set req.file
-        // We need a mechanism to tell the backend to keep existing photo_url
-        // For now, if no new file is uploaded, backend keeps existing.
-        // If we want to *explicitly clear* a photo, we'd add a checkbox "Clear Photo" and send a flag.
-      }
-
-
       await authFetch(`/meals/${newlyAddedMeal.id}`, {
         method: 'PUT',
-        body: formToUpdate, // Send FormData
+        body: JSON.stringify({
+          title: currentMealData.title,
+          description: currentMealData.description,
+          date_made: currentMealData.date_made,
+          photo_url: currentMealData.photo_url, // Keep current photo URL
+          tags: currentMealData.tags,
+          ingredients: currentMealData.ingredients.map((ing: any) => ({
+              name: ing.name,
+              quantity: ing.quantity,
+              unit: ing.unit,
+              calories: ing.calories,
+              protein: ing.protein,
+              carbs: ing.carbs,
+              fat: ing.fat,
+          })),
+          overall_rating: rating,
+        }),
       });
 
-      let suggestedRank: number | undefined;
-      if (rating === 5) suggestedRank = 1;
-      else if (rating === 3) suggestedRank = 5;
-
-      if (suggestedRank !== undefined) {
-          await authFetch('/rankings', {
-              method: 'POST',
-              body: JSON.stringify({ mealId: newlyAddedMeal.id, rankPosition: suggestedRank }),
-          });
-      }
-
+      // 2. Prepare for comparison if rating is Good/Okay and other meals exist
+      // No direct rank assignment here anymore, only via comparison
       if (rating === 5 || rating === 3) {
         const allMeals = await authFetch('/meals');
         const comparableMeals = allMeals.filter(
@@ -167,11 +154,12 @@ const AddMealPage: React.FC = () => {
         if (comparableMeals.length > 0) {
           const randomIndex = Math.floor(Math.random() * comparableMeals.length);
           setMealToCompareWith(comparableMeals[randomIndex]);
-          setIsComparisonModalOpen(true);
-          return;
+          setIsComparisonModalOpen(true); // Open the comparison modal
+          return; // Stop here, comparison modal will handle final navigation
         }
       }
 
+      // If no comparison is needed/possible, navigate
       alert('Meal added and rated successfully!');
       navigate('/meals');
     } catch (err: any) {
@@ -189,44 +177,26 @@ const AddMealPage: React.FC = () => {
     }
 
     try {
-      let targetRank: number;
+      // Send comparison result to new backend endpoint
+      const comparisonType = betterMealId === newlyAddedMeal.id ? 'win' :
+                            betterMealId === mealToCompareWith.id ? 'lose' : 'tie';
 
-      const rankedComparedResult = await authFetch(`/rankings?mealId=${mealToCompareWith.id}`);
-      const currentComparedRank: number | undefined = rankedComparedResult[0]?.rank_position;
-
-      if (betterMealId === newlyAddedMeal.id) {
-        if (currentComparedRank !== undefined) {
-          targetRank = Math.max(1, currentComparedRank - 1);
-        } else {
-          targetRank = 1;
-        }
-      } else if (betterMealId === mealToCompareWith.id) {
-        if (currentComparedRank !== undefined) {
-          targetRank = currentComparedRank + 1;
-        } else {
-          targetRank = 10;
-        }
-      } else {
-        if (currentComparedRank !== undefined) {
-          targetRank = currentComparedRank;
-        } else {
-          targetRank = 5;
-        }
-      }
-
-      targetRank = Math.min(10, Math.max(1, targetRank));
-
-      await authFetch('/rankings', {
+      await authFetch('/rankings/compare', { // NEW: Call recordComparison endpoint
         method: 'POST',
-        body: JSON.stringify({ mealId: newlyAddedMeal.id, rankPosition: targetRank }),
+        body: JSON.stringify({
+          winnerId: comparisonType === 'win' ? newlyAddedMeal.id : mealToCompareWith.id,
+          loserId: comparisonType === 'win' ? mealToCompareWith.id : newlyAddedMeal.id,
+          type: comparisonType,
+        }),
       });
-      alert('Meal ranked based on comparison!');
+
+      alert('Comparison recorded, scores updated!');
 
     } catch (err: any) {
       console.error('Error during comparison ranking:', err);
-      alert('Meal added, but comparison ranking failed. Check console.');
+      alert('Comparison failed. Check console.');
     } finally {
-      navigate('/meals');
+      navigate('/meals'); // Finally navigate to meals list
     }
   };
 
@@ -246,7 +216,6 @@ const AddMealPage: React.FC = () => {
           <label htmlFor="date_made">Date Made:</label>
           <input type="date" id="date_made" name="date_made" value={formData.date_made} onChange={handleChange} required />
         </div>
-        {/* Photo Upload Field */}
         <div className="form-group">
           <label htmlFor="photo">Upload Photo:</label>
           <input type="file" id="photo" name="photo" accept="image/*" onChange={handlePhotoChange} />
