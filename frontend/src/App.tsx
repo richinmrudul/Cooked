@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'; // Import useLocation
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -6,17 +6,16 @@ import MealsPage from './pages/MealsPage';
 import AddMealPage from './pages/AddMealPage';
 import EditMealPage from './pages/EditMealPage';
 import RankingsPage from './pages/RankingsPage';
-import LandingPage from './pages/LandingPage'; // Import LandingPage
+import LandingPage from './pages/LandingPage';
+import ProfilePage from './pages/ProfilePage'; // Import ProfilePage
 import ProtectedRoute from './components/ProtectedRoute';
 import { useAuth } from './context/AuthContext';
 
-// Import AppHeader (for authenticated users)
 import AppHeader from './components/AppHeader';
-// AuthHeader is no longer implicitly rendered here, only its content moved to LandingPage
 
 function App() {
   const { user, loading } = useAuth();
-  const location = useLocation(); // Get current location
+  const location = useLocation();
 
   if (loading) {
     return <div className="app-main-content text-center">Loading application...</div>;
@@ -24,17 +23,18 @@ function App() {
 
   const isAuthenticated = !!user;
 
-  // Determine if we should show the AppHeader (only for authenticated, non-root routes)
-  const showAppHeader = isAuthenticated && location.pathname !== '/'; // Show AppHeader if authenticated AND not on LandingPage
+  // Show AppHeader if authenticated AND not on LandingPage, Login, or Register
+  const showAppHeader = isAuthenticated && !['/', '/login', '/register'].includes(location.pathname);
+
 
   return (
     <>
-      {showAppHeader && <AppHeader />} {/* Render AppHeader for authenticated pages */}
+      {showAppHeader && <AppHeader />}
 
       <div className="app-main-content">
         <Routes>
           {/* Landing Page (Public) */}
-          <Route path="/" element={isAuthenticated ? <Navigate to="/meals" replace /> : <LandingPage />} /> {/* Redirect if logged in */}
+          <Route path="/" element={isAuthenticated ? <Navigate to="/meals" replace /> : <LandingPage />} />
 
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -81,7 +81,14 @@ function App() {
               </ProtectedRoute>
             }
           />
-          {/* Fallback route for unmatched paths - redirects to login if not authenticated, else meals */}
+          <Route
+            path="/profile" // New Profile Page route
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={isAuthenticated ? <Navigate to="/meals" replace /> : <Navigate to="/login" replace />} />
         </Routes>
       </div>
