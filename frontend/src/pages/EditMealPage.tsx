@@ -79,22 +79,22 @@ const EditMealPage: React.FC = () => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setPhotoFile(file);
-      setCurrentPhotoUrl(URL.createObjectURL(file));
-      setClearPhoto(false);
+      setCurrentPhotoUrl(URL.createObjectURL(file)); // Show new file as preview
+      setClearPhoto(false); // If new file selected, don't clear
     } else {
       setPhotoFile(null);
-      if (!clearPhoto) {
+      if (!clearPhoto) { // Only clear preview if no new file selected AND we're not explicitly clearing existing
         setCurrentPhotoUrl(null);
       }
     }
   };
 
   const handleClearPhoto = () => {
-    setPhotoFile(null);
-    setCurrentPhotoUrl(null);
-    setClearPhoto(true);
+    setPhotoFile(null); // Clear any newly selected file
+    setCurrentPhotoUrl(null); // Clear the preview
+    setClearPhoto(true); // Set flag to tell backend to clear existing photo
     const photoInput = document.getElementById('photo-edit') as HTMLInputElement;
-    if (photoInput) photoInput.value = '';
+    if (photoInput) photoInput.value = ''; // Clear file input field
   };
 
   const handleIngredientChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -124,12 +124,11 @@ const EditMealPage: React.FC = () => {
     formToSend.append('date_made', formData.date_made);
     formToSend.append('overall_rating', String(formData.overall_rating));
     formToSend.append('tags', JSON.stringify(formData.tags.split(',').map(tag => tag.trim()).filter(tag => tag)));
-    // FIX: Convert quantity to number for backend submission
     formToSend.append('ingredients', JSON.stringify(ingredients.map(ing => ({
       name: ing.name.trim(),
-      quantity: Number(ing.quantity) || 0, // Convert to number here
+      quantity: Number(ing.quantity) || 0,
       unit: ing.unit.trim(),
-    })).filter(ing => ing.name && Number(ing.quantity) > 0))); // Filter based on numerical quantity
+    })).filter(ing => ing.name && Number(ing.quantity) > 0)));
 
     if (photoFile) {
       formToSend.append('photo', photoFile);

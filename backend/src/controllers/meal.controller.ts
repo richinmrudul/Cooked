@@ -37,8 +37,11 @@ const createMeal = async (req: Request, res: Response) => {
       try { parsedIngredients = JSON.parse(ingredients); } catch (e) { console.error("Failed to parse ingredients JSON string:", ingredients, e); return res.status(400).json({ message: "Invalid ingredients format." }); }
   }
 
+  // NEW: photo_url_to_save comes directly from Cloudinary path
   let photo_url_to_save: string | null = null;
-  if (photoFile) { photo_url_to_save = `http://localhost:${process.env.PORT || 5000}/uploads/${photoFile.filename}`; }
+  if (photoFile) {
+    photo_url_to_save = photoFile.path; // Multer-Cloudinary puts the Cloudinary URL in .path
+  }
 
   if (!userId) { return res.status(401).json({ message: 'User not authenticated.' }); }
   if (!title || !date_made || overall_rating === undefined) { return res.status(400).json({ message: 'Title, date_made, and overall_rating are required.' }); }
@@ -239,7 +242,7 @@ const updateMeal = async (req: Request, res: Response) => {
 
   let photo_url_to_save: string | null = currentPhotoUrl;
   if (photoFile) {
-    photo_url_to_save = `http://localhost:${process.env.PORT || 5000}/uploads/${photoFile.filename}`;
+    photo_url_to_save = photoFile.path; // NEW: Use Cloudinary URL from .path
   } else if (photo_url_is_null === 'true') {
     photo_url_to_save = null;
   }

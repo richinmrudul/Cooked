@@ -89,6 +89,7 @@ const updateProfile = async (req: Request, res: Response) => {
     }
 
     const { firstName, lastName, email, password, currentPassword, profilePhotoUrl, photo_url_is_null } = req.body;
+    const profilePhotoFile = req.file; // Get the file from req.file
 
     try {
         await pool.query('BEGIN');
@@ -113,13 +114,11 @@ const updateProfile = async (req: Request, res: Response) => {
             newPasswordHash = await bcrypt.hash(password, 10);
         }
 
-        let newProfilePhotoUrl: string | null = user.profile_photo_url;
-        if (profilePhotoUrl) { // Assuming profilePhotoUrl is sent directly from frontend if it's a URL input
-            newProfilePhotoUrl = profilePhotoUrl;
+        let newProfilePhotoUrl: string | null = user.profile_photo_url; // Default to current URL from DB
+        if (profilePhotoFile) {
+            newProfilePhotoUrl = profilePhotoFile.path; // NEW: Use Cloudinary URL from .path
         } else if (photo_url_is_null === 'true') { // Flag sent from frontend to explicitly clear photo
             newProfilePhotoUrl = null;
-        } else if (req.file) { // If profilePhoto is sent as a file
-            newProfilePhotoUrl = `http://localhost:${process.env.PORT || 5000}/uploads/${req.file.filename}`;
         }
 
         const updateResult: QueryResult = await pool.query(
