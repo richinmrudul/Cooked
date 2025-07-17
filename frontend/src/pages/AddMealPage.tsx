@@ -196,119 +196,122 @@ const AddMealPage: React.FC = () => {
   };
 
   return (
-    <div className="card card-md">
-      <h2>Add New Meal</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="title">Title:</label>
-          <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} required />
-        </div>
-        <div className="form-group">
-          <label htmlFor="description">Description:</label>
-          <textarea id="description" name="description" value={formData.description} onChange={handleChange} rows={4}></textarea>
-        </div>
-        <div className="form-group">
-          <label htmlFor="date_made">Date Made:</label>
-          <input type="date" id="date_made" name="date_made" value={formData.date_made} onChange={handleChange} required />
-        </div>
-        {/* NEW: Photo Upload Field (instead of URL) */}
-        <div className="form-group">
-          <label htmlFor="photo">Upload Photo:</label>
-          <input type="file" id="photo" name="photo" accept="image/*" onChange={handlePhotoChange} />
-          {photoPreview && (
-            <img src={photoPreview} alt="Photo Preview" className="mt-10" style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'cover' }} />
-          )}
-        </div>
-        <div className="form-group">
-          <label htmlFor="tags">Tags (comma-separated):</label>
-          <input type="text" id="tags" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" />
-        </div>
-
-        <h3 className="mt-30 mb-15">Ingredients</h3>
-        {ingredients.map((ingredient, index) => (
-          <div key={index} className="ingredient-item">
-            <div className="form-group grid-layout grid-cols-3 grid-gap-10">
-              <div>
-                <label htmlFor={`ingredient-name-${index}`}>Name:</label>
-                <input
-                  type="text"
-                  id={`ingredient-name-${index}`}
-                  name="name"
-                  value={ingredient.name}
-                  onChange={(e) => handleIngredientChange(index, e)}
-                  placeholder="e.g., Chicken Breast"
-                />
-              </div>
-              <div>
-                <label htmlFor={`ingredient-quantity-${index}`}>Quantity:</label>
-                <input
-                  type="number"
-                  id={`ingredient-quantity-${index}`}
-                  name="quantity"
-                  value={ingredient.quantity}
-                  onChange={(e) => handleIngredientChange(index, e)}
-                  placeholder="e.g., 200"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label htmlFor={`ingredient-unit-${index}`}>Unit:</label>
-                <input
-                  type="text"
-                  id={`ingredient-unit-${index}`}
-                  name="unit"
-                  value={ingredient.unit}
-                  onChange={(e) => handleIngredientChange(index, e)}
-                  placeholder="g / ml / pcs"
-                />
-              </div>
-            </div>
-            {ingredients.length > 1 && (
-              <div className="d-flex justify-content-end mt-10">
-                <button type="button" onClick={() => handleRemoveIngredient(index)} className="btn btn-danger btn-sm">
-                  Remove Ingredient
-                </button>
+    <div className="app-main-content d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
+      <div className="card card-md" style={{ boxShadow: '0 8px 32px rgba(108,99,255,0.10)', borderRadius: 20, padding: 40, maxWidth: 540 }}>
+        <h2 className="text-center mb-20" style={{ fontWeight: 800, fontSize: '2.1rem' }}>Add New Meal</h2>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="title">Title:</label>
+            <input type="text" id="title" name="title" value={formData.title} onChange={handleChange} required className="mb-10" style={{ fontSize: '1.1em', borderRadius: 10, padding: '14px 18px' }} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="description">Description:</label>
+            <textarea id="description" name="description" value={formData.description} onChange={handleChange} rows={4} className="mb-10" style={{ fontSize: '1.1em', borderRadius: 10, padding: '14px 18px' }}></textarea>
+          </div>
+          <div className="form-group">
+            <label htmlFor="date_made">Date Made:</label>
+            <input type="date" id="date_made" name="date_made" value={formData.date_made} onChange={handleChange} required className="mb-10" style={{ fontSize: '1.1em', borderRadius: 10, padding: '14px 18px' }} />
+          </div>
+          <div className="form-group">
+            <label htmlFor="photo">Upload Photo:</label>
+            <input type="file" id="photo" name="photo" accept="image/*" onChange={handlePhotoChange} />
+            {photoPreview && (
+              <div className="d-flex justify-content-center mt-10">
+                <img src={photoPreview} alt="Photo Preview" style={{ maxWidth: 120, maxHeight: 120, borderRadius: 16, boxShadow: '0 2px 12px rgba(108,99,255,0.10)', border: '2px solid #e0e0e0', objectFit: 'cover' }} />
               </div>
             )}
           </div>
-        ))}
-        <div className="d-flex justify-content-center mt-10">
-          <button type="button" onClick={handleAddIngredient} className="btn btn-secondary-muted">
-            Add Another Ingredient
-          </button>
-        </div>
+          <div className="form-group">
+            <label htmlFor="tags">Tags (comma-separated):</label>
+            <input type="text" id="tags" name="tags" value={formData.tags} onChange={handleChange} placeholder="e.g., pasta, comfort food" className="mb-10" style={{ fontSize: '1.1em', borderRadius: 10, padding: '14px 18px' }} />
+          </div>
 
-        {error && <p className="text-error mt-15 mb-15">{error}</p>}
-        <div className="d-flex justify-content-between mt-20">
-          <button type="submit" disabled={loading} className="btn btn-primary">
-            {loading ? 'Adding...' : 'Add Meal'}
-          </button>
-          <Link to="/meals" className="btn btn-secondary-muted">
-            Cancel
-          </Link>
-        </div>
-      </form>
+          <hr className="mb-20 mt-30" style={{ border: 'none', borderTop: '1.5px solid #ececec' }} />
 
-      {/* Rating Modal */}
-      {newlyAddedMeal && (
-        <RatingModal
-          isOpen={isRatingModalOpen}
-          onClose={() => { setIsRatingModalOpen(false); navigate('/meals'); }}
-          onRate={handleModalRating}
-          mealTitle={newlyAddedMeal.title}
-        />
-      )}
+          <h3 className="text-center mb-15" style={{ fontWeight: 700, fontSize: '1.3rem', letterSpacing: 0.5 }}>Ingredients</h3>
+          <div style={{ background: '#f8f9fa', borderRadius: 14, padding: 18, marginBottom: 24, boxShadow: '0 1px 6px rgba(108,99,255,0.04)' }}>
+            {ingredients.map((ingredient, index) => (
+              <div key={index} className="ingredient-item mb-10" style={{ display: 'flex', gap: 10, alignItems: 'flex-end', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: 120, maxWidth: 220 }}>
+                  <label htmlFor={`ingredient-name-${index}`}>Name:</label>
+                  <input
+                    type="text"
+                    id={`ingredient-name-${index}`}
+                    name="name"
+                    value={ingredient.name}
+                    onChange={(e) => handleIngredientChange(index, e)}
+                    placeholder="e.g., Chicken Breast"
+                    style={{ borderRadius: 8, padding: '10px 14px', width: '100%' }}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 100, maxWidth: 140 }}>
+                  <label htmlFor={`ingredient-quantity-${index}`}>Quantity:</label>
+                  <input
+                    type="number"
+                    id={`ingredient-quantity-${index}`}
+                    name="quantity"
+                    value={ingredient.quantity}
+                    onChange={(e) => handleIngredientChange(index, e)}
+                    placeholder="e.g., 200"
+                    style={{ borderRadius: 8, padding: '10px 14px', width: '100%' }}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 80, maxWidth: 120 }}>
+                  <label htmlFor={`ingredient-unit-${index}`}>Unit:</label>
+                  <input
+                    type="text"
+                    id={`ingredient-unit-${index}`}
+                    name="unit"
+                    value={ingredient.unit}
+                    onChange={(e) => handleIngredientChange(index, e)}
+                    placeholder="g / ml / pcs"
+                    style={{ borderRadius: 8, padding: '10px 14px', width: '100%' }}
+                  />
+                </div>
+                {ingredients.length > 1 && (
+                  <button type="button" className="btn btn-danger btn-sm" style={{ height: 38, marginBottom: 2 }} onClick={() => handleRemoveIngredient(index)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+            <div className="d-flex justify-content-center mt-10">
+              <button type="button" className="btn btn-outline-primary btn-sm" onClick={handleAddIngredient}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="9" cy="9" r="8.5" stroke="#6c63ff"/><path d="M9 5V13" stroke="#6c63ff" strokeWidth="2" strokeLinecap="round"/><path d="M5 9H13" stroke="#6c63ff" strokeWidth="2" strokeLinecap="round"/></svg>
+                  Add Ingredient
+                </span>
+              </button>
+            </div>
+          </div>
 
-      {/* Comparison Modal */}
-      {newlyAddedMeal && mealToCompareWith && ( // Assuming this is still used for comparison
-        <ComparisonModal
-          isOpen={isComparisonModalOpen}
-          onClose={() => { setIsComparisonModalOpen(false); navigate('/meals'); }}
-          onCompare={handleComparisonResult}
-          newMeal={{ id: newlyAddedMeal.id, title: newlyAddedMeal.title, photo_url: newlyAddedMeal.photo_url }}
-          comparedMeal={mealToCompareWith}
-        />
-      )}
+          {error && <p className="text-error mb-10 text-center">{error}</p>}
+          <div className="d-flex justify-content-center gap-20 mt-20">
+            <button type="submit" disabled={loading} className="btn btn-primary btn-lg" style={{ minWidth: 150, fontSize: '1.1em', display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="10" stroke="#fff" strokeWidth="2"/><path d="M11 6V16" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/><path d="M6 11H16" stroke="#fff" strokeWidth="2.2" strokeLinecap="round"/></svg>
+              {loading ? 'Adding...' : 'Add Meal'}
+            </button>
+            <Link to="/meals" className="btn btn-secondary-muted btn-lg" style={{ minWidth: 120 }}>Cancel</Link>
+          </div>
+        </form>
+        {newlyAddedMeal && (
+          <RatingModal
+            isOpen={isRatingModalOpen}
+            onClose={() => setIsRatingModalOpen(false)}
+            onRate={handleModalRating}
+            mealTitle={newlyAddedMeal.title}
+          />
+        )}
+        {newlyAddedMeal && mealToCompareWith && (
+          <ComparisonModal
+            isOpen={isComparisonModalOpen}
+            onClose={() => setIsComparisonModalOpen(false)}
+            onCompare={handleComparisonResult}
+            newMeal={newlyAddedMeal}
+            comparedMeal={mealToCompareWith}
+          />
+        )}
+      </div>
     </div>
   );
 };

@@ -14,8 +14,8 @@ interface UserProfile {
   stats: {
     totalMeals: number;
     averageRating: number;
-    currentStreak: number; // NEW: current streak
-    longestStreak: number; // NEW: longest streak
+    currentStreak: number; // current streak
+    longestStreak: number; // longest streak
     topRankedMeals: Array<{
       id: string;
       title: string;
@@ -26,7 +26,7 @@ interface UserProfile {
       score: number;
     }>;
   };
-  lastMealDate?: string | null; // NEW: last meal date
+  lastMealDate?: string | null; // last meal date
 }
 
 const ProfilePage: React.FC = () => {
@@ -174,72 +174,74 @@ const ProfilePage: React.FC = () => {
   }
 
   return (
-    <div className="card card-lg">
+    <div className="card card-lg" style={{ maxWidth: 700, margin: '40px auto' }}>
       <div className="d-flex justify-content-between align-items-center mb-30">
-        <h2>User Profile</h2>
+        <h2 style={{ fontWeight: 800, fontSize: '2rem', marginBottom: 0 }}>User Profile</h2>
         <div className="d-flex gap-10">
-            <button onClick={() => setEditMode(!editMode)} className="btn btn-secondary-muted">
-                {editMode ? 'Cancel Edit' : 'Edit Profile'}
-            </button>
-            <button onClick={logout} className="btn btn-danger">Logout</button>
+          <button onClick={() => setEditMode(!editMode)} className="btn btn-secondary-muted btn-sm" style={{ minWidth: 110 }}>
+            {editMode ? 'Cancel Edit' : 'Edit Profile'}
+          </button>
+          <button onClick={logout} className="btn btn-danger btn-sm" style={{ minWidth: 90 }}>Logout</button>
         </div>
       </div>
+      <hr style={{ border: 'none', borderTop: '1.5px solid #ececec', margin: '0 0 28px 0' }} />
 
       {!editMode ? (
         <div className="profile-display">
-            <div className="profile-header d-flex align-items-center mb-30">
-                <img
-                    src={profile.profilePhotoUrl || 'https://via.placeholder.com/100/eeeeee/888888?text=Avatar'}
-                    alt="Profile"
-                    className="profile-avatar mr-20"
-                />
-                <div className="profile-info flex-grow-1">
-                    <h3 className="profile-name mb-5">{profile.firstName} {profile.lastName}</h3>
-                    <p className="profile-email text-muted mb-5">Email: {profile.email}</p>
-                    <p className="profile-member-since text-muted">Member since: {new Date(profile.createdAt).toLocaleDateString()}</p>
-                </div>
+          <div className="d-flex flex-column align-items-center mb-30">
+            <img
+              src={profile.profilePhotoUrl || 'https://via.placeholder.com/120/eeeeee/888888?text=Avatar'}
+              alt="Profile"
+              className="profile-avatar"
+              style={{ width: 120, height: 120, borderRadius: '50%', boxShadow: '0 2px 12px rgba(108,99,255,0.13)', border: '3px solid #fff', marginBottom: 18 }}
+            />
+            <div className="text-center">
+              <h3 className="profile-name mb-5" style={{ fontWeight: 700, fontSize: '1.5em', color: '#2c3e50' }}>{profile.firstName} {profile.lastName}</h3>
+              <div className="profile-email text-muted mb-2" style={{ fontSize: '1.05em' }}>Email: {profile.email}</div>
+              <div className="profile-member-since text-muted" style={{ fontSize: '0.98em' }}>Member since: {new Date(profile.createdAt).toLocaleDateString()}</div>
             </div>
+          </div>
 
-            <h3 className="mb-15">Meal Stats Summary</h3>
-            <div className="grid-layout grid-cols-2 grid-gap-20 mb-30">
-                <div className="stat-card">
-                    <p className="stat-label">Total Meals Cooked:</p>
-                    <p className="stat-value">{profile.stats.totalMeals}</p>
-                </div>
-                <div className="stat-card">
-                    <p className="stat-label">Average Rating:</p>
-                    <p className="stat-value">{profile.stats.averageRating ? profile.stats.averageRating.toFixed(2) : 'N/A'}</p>
-                </div>
-                {/*Display Current and Longest Streak */}
-                <div className="stat-card">
-                    <p className="stat-label">Current Streak:</p>
-                    <p className="stat-value">{profile.stats.currentStreak} days</p>
-                </div>
-                <div className="stat-card">
-                    <p className="stat-label">Longest Streak:</p>
-                    <p className="stat-value">{profile.stats.longestStreak} days</p>
-                </div>
+          <div style={{ background: '#fff', borderRadius: 18, padding: '32px 18px', margin: '0 auto 32px auto', boxShadow: '0 4px 24px rgba(108,99,255,0.10)', maxWidth: 520, border: '1.5px solid #ececec' }}>
+            <h3 className="mb-20 text-center" style={{ fontWeight: 800, fontSize: '1.18em', color: '#2c3e50', letterSpacing: 0.1 }}>Meal Stats Summary</h3>
+            <div className="grid-layout grid-cols-2 grid-gap-20">
+              <div className="stat-card" style={{ background: 'transparent', boxShadow: 'none', border: 'none', textAlign: 'center' }}>
+                <div className="stat-label" style={{ color: '#2c3e50', fontWeight: 700, fontSize: '1.08em' }}>Total Meals Cooked:</div>
+                <div className="stat-value" style={{ color: '#6c63ff', fontWeight: 900, fontSize: '2.1em', letterSpacing: 0.5 }}>{profile.stats.totalMeals}</div>
+              </div>
+              <div className="stat-card" style={{ background: 'transparent', boxShadow: 'none', border: 'none', textAlign: 'center' }}>
+                <div className="stat-label" style={{ color: '#2c3e50', fontWeight: 700, fontSize: '1.08em' }}>Average Rating:</div>
+                <div className="stat-value" style={{ color: '#6c63ff', fontWeight: 900, fontSize: '2.1em', letterSpacing: 0.5 }}>{profile.stats.averageRating ? profile.stats.averageRating.toFixed(2) : 'N/A'}</div>
+              </div>
+              <div className="stat-card" style={{ background: 'transparent', boxShadow: 'none', border: 'none', textAlign: 'center' }}>
+                <div className="stat-label" style={{ color: '#2c3e50', fontWeight: 700, fontSize: '1.08em' }}>Current Streak:</div>
+                <div className="stat-value" style={{ color: '#6c63ff', fontWeight: 900, fontSize: '2.1em', letterSpacing: 0.5 }}>{profile.stats.currentStreak} days</div>
+              </div>
+              <div className="stat-card" style={{ background: 'transparent', boxShadow: 'none', border: 'none', textAlign: 'center' }}>
+                <div className="stat-label" style={{ color: '#2c3e50', fontWeight: 700, fontSize: '1.08em' }}>Longest Streak:</div>
+                <div className="stat-value" style={{ color: '#6c63ff', fontWeight: 900, fontSize: '2.1em', letterSpacing: 0.5 }}>{profile.stats.longestStreak} days</div>
+              </div>
             </div>
+          </div>
 
-            <h3 className="mb-15">Your Top 5 Meals</h3>
-            {profile.stats.topRankedMeals.length === 0 ? (
-                <p className="text-muted text-center">No top meals ranked yet.</p>
-            ) : (
-                <div className="d-flex flex-column gap-15">
-                    {profile.stats.topRankedMeals.map((meal) => (
-                        <div key={meal.id} className="ranked-meal-item">
-                            <div className="rank-indicator">{meal.rank_position}</div>
-                            {meal.photo_url && <img src={meal.photo_url} alt={meal.title} className="ranked-meal-image" />}
-                            <div className="ranked-meal-details">
-                                <h4 className="ranked-meal-title">{meal.title}</h4>
-                                <p className="ranked-meal-score-display text-muted">Score: {meal.score.toFixed(0)}</p>
-                                <p className="ranked-meal-date">Made: {new Date(meal.date_made).toLocaleDateString()}</p>
-                            </div>
-                            <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm">Edit</Link>
-                        </div>
-                    ))}
+          <h3 className="mb-15 text-center" style={{ fontWeight: 700, fontSize: '1.2em', color: '#2c3e50' }}>Your Top 5 Meals</h3>
+          {profile.stats.topRankedMeals.length === 0 ? (
+            <p className="text-muted text-center">No top meals ranked yet.</p>
+          ) : (
+            <div className="d-flex flex-column gap-15" style={{ maxWidth: 520, margin: '0 auto' }}>
+              {profile.stats.topRankedMeals.map((meal) => (
+                <div key={meal.id} className="ranked-meal-item" style={{ background: '#fff', borderRadius: 14, boxShadow: '0 2px 8px rgba(108,99,255,0.07)', padding: '16px 18px', alignItems: 'center' }}>
+                  <div className="rank-indicator" style={{ minWidth: 44, minHeight: 44, width: 44, height: 44, fontSize: '1.2em', fontWeight: 700, background: 'linear-gradient(135deg, #6c63ff 70%, #8e88ff 100%)', color: '#fff', boxShadow: '0 1px 4px rgba(108,99,255,0.10)' }}>{meal.rank_position}</div>
+                  {meal.photo_url && <img src={meal.photo_url} alt={meal.title} className="ranked-meal-image" style={{ width: 48, height: 48, borderRadius: 10, marginLeft: 10, marginRight: 10, objectFit: 'cover', boxShadow: '0 1px 4px rgba(108,99,255,0.07)' }} />}
+                  <div className="ranked-meal-details" style={{ flex: 1, minWidth: 0 }}>
+                    <div className="ranked-meal-title" style={{ fontWeight: 600, fontSize: '1.05em', color: '#2c3e50', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.title}</div>
+                    <div className="ranked-meal-date" style={{ fontSize: '0.95em', color: '#888' }}>Made: {new Date(meal.date_made).toLocaleDateString()}</div>
+                  </div>
+                  <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm" style={{ minWidth: 70, marginLeft: 10 }}>Edit</Link>
                 </div>
-            )}
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div className="profile-edit-form">

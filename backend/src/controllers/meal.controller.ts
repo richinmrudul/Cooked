@@ -56,28 +56,31 @@ const createMeal = async (req: Request, res: Response) => {
     const userData = userStreakResult.rows[0];
     let { current_streak, longest_streak, last_meal_date } = userData || { current_streak: 0, longest_streak: 0, last_meal_date: null };
 
-    const currentServerDateUTC = new Date(); // Get the current server date/time
-    currentServerDateUTC.setUTCHours(0, 0, 0, 0); // Normalize to start of day UTC
+    // Use the meal's date_made (normalized to UTC midnight) for streak logic
+    const mealDateUTC = new Date(date_made);
+    mealDateUTC.setUTCHours(0, 0, 0, 0);
 
     let newCurrentStreak = current_streak;
     let newLongestStreak = longest_streak;
-    let newLastMealDate = currentServerDateUTC; // Update last_meal_date to the current server date
+    let newLastMealDate = mealDateUTC; // Update last_meal_date to the meal's date
 
     if (last_meal_date) {
         const lastMealDateObj = new Date(last_meal_date);
         lastMealDateObj.setUTCHours(0, 0, 0, 0);
 
-        // Calculate difference in days between current server date and last logged meal date
-        const diffTime = currentServerDateUTC.getTime() - lastMealDateObj.getTime();
+        // Calculate difference in days between meal date and last logged meal date
+        const diffTime = mealDateUTC.getTime() - lastMealDateObj.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-        if (diffDays === 1) { // Cooked yesterday (based on server time), streak continues
+        if (diffDays === 1) { // Cooked the day after last meal, streak continues
             newCurrentStreak++;
-        } else if (diffDays === 0) { // Cooked already today (multiple meals on same day), streak doesn't change
+        } else if (diffDays === 0) { // Multiple meals on same day, streak doesn't change
             // newCurrentStreak remains the same
-            
-        } else { // Gap of more than 1 day, or logging a meal for a past date relative to last_meal_date, reset streak
-            newCurrentStreak = 1; // Start a new streak
+        } else if (diffDays > 1) { // Gap of more than 1 day, reset streak
+            newCurrentStreak = 1;
+        } else if (diffDays < 0) { // Logging a meal for a date before last_meal_date, do not update streak
+            newCurrentStreak = current_streak;
+            newLastMealDate = lastMealDateObj;
         }
     } else {
         // First meal ever

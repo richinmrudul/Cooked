@@ -17,11 +17,6 @@ interface Meal {
     quantity: number;
     unit?: string;
   }>;
-  // Whole-meal macros
-  calories?: number | null;
-  protein?: number | null;
-  carbs?: number | null;
-  fat?: number | null;
 }
 
 const MealsPage: React.FC = () => {
@@ -31,7 +26,6 @@ const MealsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for search and filters
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState('');
   const [minRating, setMinRating] = useState('');
@@ -40,10 +34,10 @@ const MealsPage: React.FC = () => {
   const [endDate, setEndDate] = useState('');
   const [allTags, setAllTags] = useState<string[]>([]);
 
-  // State to control filter section visibility
   const [showFilters, setShowFilters] = useState(false);
 
-  const fetchAllTags = useCallback(async () => { // Make this useCallback too
+
+  const fetchAllTags = useCallback(async () => {
       try {
         const data = await authFetch('/meals');
         const tagsSet = new Set<string>();
@@ -54,7 +48,7 @@ const MealsPage: React.FC = () => {
       } catch (err) {
         console.error('Error fetching all tags:', err);
       }
-  }, [authFetch]); // Dependencies
+  }, [authFetch]);
 
   const fetchMeals = useCallback(async () => {
     try {
@@ -86,7 +80,7 @@ const MealsPage: React.FC = () => {
       fetchAllTags();
       fetchMeals();
     }
-  }, [user, fetchAllTags, fetchMeals]); // Add fetchAllTags to dependencies
+  }, [user, fetchAllTags, fetchMeals]);
 
 
   const handleClearFilters = () => {
@@ -125,125 +119,98 @@ const MealsPage: React.FC = () => {
   return (
     <div className="card card-lg">
       <div className="d-flex justify-content-between align-items-center mb-20">
-        <h2>Your Cooked Meals</h2>
-        <div className="d-flex gap-10">
-          <Link to="/meals/new" className="btn btn-success">
-            Add New Meal
-          </Link>
-          <Link to="/rankings" className="btn btn-info">
-            View Rankings
-          </Link>
-          <button onClick={logout} className="btn btn-danger">
-            Logout
-          </button>
-        </div>
+        <h2 style={{ fontWeight: 800, fontSize: '2rem', marginBottom: 0 }}>Your Cooked Meals</h2>
+        <Link to="/meals/new" className="btn btn-primary btn-lg" style={{ minWidth: 160, fontWeight: 600 }}>
+          + Add New Meal
+        </Link>
       </div>
+      <hr style={{ border: 'none', borderTop: '1.5px solid #ececec', margin: '0 0 28px 0' }} />
 
-      <div className="filter-controls card mb-30 p-20">
-        <div className="form-group mb-0">
-          <label htmlFor="search-query" className="sr-only">Search by Title or Description:</label>
+      <div className="filter-controls card mb-30 p-20" style={{ boxShadow: '0 1px 6px rgba(108,99,255,0.04)', borderRadius: 14, background: '#fafbfc', maxWidth: 700, margin: '0 auto 32px auto' }}>
+        <div className="d-flex gap-10 align-items-center mb-10" style={{ flexWrap: 'wrap' }}>
           <input
             type="text"
             id="search-query"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search meals..."
-            className="mb-10"
+            className="mb-0"
+            style={{ flex: 1, minWidth: 180, borderRadius: 8, padding: '12px 16px', fontSize: '1em' }}
           />
+          <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary-muted btn-sm" style={{ minWidth: 110 }}>
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </button>
+          <button onClick={fetchMeals} className="btn btn-primary btn-sm" style={{ minWidth: 90 }}>Search</button>
         </div>
-        <div className="d-flex justify-content-end gap-10">
-            <button onClick={() => setShowFilters(!showFilters)} className="btn btn-secondary-muted btn-sm">
-                {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button>
-            <button onClick={fetchMeals} className="btn btn-primary btn-sm">Search</button>
-        </div>
-
         {showFilters && (
-            <div className="d-flex flex-wrap gap-15 mt-20">
-                <div className="form-group flex-grow-1">
-                    <label htmlFor="tag-filter">Filter by Tag:</label>
-                    <select id="tag-filter" value={selectedTag} onChange={(e) => setSelectedTag(e.target.value)}>
-                    <option value="">All Tags</option>
-                    {allTags.map(tag => (
-                        <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                    </select>
-                </div>
-
-                <div className="form-group flex-grow-1">
-                    <label htmlFor="min-rating">Min Rating (1-5):</label>
-                    <input type="number" id="min-rating" value={minRating} onChange={(e) => setMinRating(e.target.value)} min="1" max="5" placeholder="1"/>
-                </div>
-                <div className="form-group flex-grow-1">
-                    <label htmlFor="max-rating">Max Rating (1-5):</label>
-                    <input type="number" id="max-rating" value={maxRating} onChange={(e) => setMaxRating(e.target.value)} min="1" max="5" placeholder="5"/>
-                </div>
-
-                <div className="form-group flex-grow-1">
-                    <label htmlFor="start-date">Start Date:</label>
-                    <input type="date" id="start-date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-                </div>
-                <div className="form-group flex-grow-1">
-                    <label htmlFor="end-date">End Date:</label>
-                    <input type="date" id="end-date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-                </div>
-                <div className="d-flex justify-content-end mt-10 w-100">
-                    <button onClick={handleClearFilters} className="btn btn-secondary-muted btn-sm">Clear Filters</button>
-                </div>
+          <div className="d-flex flex-wrap gap-15 mt-10">
+            <div className="form-group flex-grow-1">
+              <label htmlFor="tag-filter">Filter by Tag:</label>
+              <select id="tag-filter" value={selectedTag} onChange={(e) => setSelectedTag(e.target.value)} style={{ borderRadius: 8, padding: '10px 14px' }}>
+                <option value="">All Tags</option>
+                {allTags.map(tag => (
+                  <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </select>
             </div>
+            <div className="form-group flex-grow-1">
+              <label htmlFor="min-rating">Min Rating (1-5):</label>
+              <input type="number" id="min-rating" value={minRating} onChange={(e) => setMinRating(e.target.value)} min="1" max="5" placeholder="1" style={{ borderRadius: 8, padding: '10px 14px' }} />
+            </div>
+            <div className="form-group flex-grow-1">
+              <label htmlFor="max-rating">Max Rating (1-5):</label>
+              <input type="number" id="max-rating" value={maxRating} onChange={(e) => setMaxRating(e.target.value)} min="1" max="5" placeholder="5" style={{ borderRadius: 8, padding: '10px 14px' }} />
+            </div>
+            <div className="form-group flex-grow-1">
+              <label htmlFor="start-date">Start Date:</label>
+              <input type="date" id="start-date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ borderRadius: 8, padding: '10px 14px' }} />
+            </div>
+            <div className="form-group flex-grow-1">
+              <label htmlFor="end-date">End Date:</label>
+              <input type="date" id="end-date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ borderRadius: 8, padding: '10px 14px' }} />
+            </div>
+            <div className="d-flex justify-content-end mt-10 w-100">
+              <button onClick={handleClearFilters} className="btn btn-secondary-muted btn-sm">Clear Filters</button>
+            </div>
+          </div>
         )}
       </div>
 
       {meals.length === 0 ? (
         <p className="text-center text-muted p-20">No meals found matching your criteria. Try adjusting filters.</p>
       ) : (
-        <div className="grid-layout grid-cols-2 grid-gap-20">
+        <div className="grid-layout grid-cols-2 grid-gap-30" style={{ marginTop: 10 }}>
           {meals.map((meal) => (
-            <div key={meal.id} className="meal-card">
+            <div key={meal.id} className="meal-card" style={{ background: '#fff', borderRadius: 16, boxShadow: '0 2px 12px rgba(108,99,255,0.07)', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 12, minHeight: 220, position: 'relative' }}>
               {meal.photo_url && (
-                <img src={meal.photo_url} alt={meal.title} className="meal-card-image" />
+                <img src={meal.photo_url} alt={meal.title} className="meal-card-image" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 12, boxShadow: '0 1px 6px rgba(108,99,255,0.07)', alignSelf: 'center', marginBottom: 8 }} />
               )}
-              <div className="meal-card-content">
-                <h3 className="meal-card-title">{meal.title}</h3>
-                <p className="meal-card-date">
-                  Made: {new Date(meal.date_made).toLocaleDateString()}
-                </p>
-                {meal.description && <p className="meal-card-description">{meal.description}</p>}
+              <div className="meal-card-content" style={{ flex: 1 }}>
+                <div className="meal-card-title" style={{ fontWeight: 700, fontSize: '1.15em', color: '#2c3e50', marginBottom: 2, textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{meal.title}</div>
+                <div className="meal-card-date" style={{ fontSize: '0.98em', color: '#888', marginBottom: 6, textAlign: 'center' }}>Made: {new Date(meal.date_made).toLocaleDateString()}</div>
+                {meal.description && <div className="meal-card-description" style={{ color: '#7f8c8d', fontSize: '1em', marginBottom: 6, textAlign: 'center' }}>{meal.description}</div>}
                 {meal.tags && meal.tags.length > 0 && (
-                  <p className="meal-card-tags text-italic">Tags: {meal.tags.join(', ')}</p>
+                  <div className="meal-card-tags text-italic" style={{ color: '#b0b0b0', fontSize: '0.95em', marginBottom: 6, textAlign: 'center' }}>Tags: {meal.tags.join(', ')}</div>
                 )}
                 {meal.ingredients && meal.ingredients.length > 0 && (
-                    <div className="meal-card-ingredients mt-10">
-                        <h4 style={{fontSize: '1em', marginBottom: '5px', color: 'var(--color-text)'}}>Ingredients:</h4>
-                        <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9em', color: 'var(--color-secondary-text)'}}>
-                            {meal.ingredients.map((ing, i) => (
-                                <li key={i}>{ing.quantity} {ing.unit} {ing.name}</li>
-                            ))}
-                        </ul>
-                    </div>
+                  <div className="meal-card-ingredients mt-10" style={{ textAlign: 'center' }}>
+                    <div style={{fontSize: '1em', marginBottom: '5px', color: '#2c3e50', fontWeight: 600}}>Ingredients:</div>
+                    <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.95em', color: '#888', display: 'inline-block', textAlign: 'left'}}>
+                      {meal.ingredients.map((ing, i) => (
+                        <li key={i}>{ing.quantity} {ing.unit} {ing.name}</li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
-                {/* Display Macros */}
-                {(meal.calories || meal.protein || meal.carbs || meal.fat) ? (
-                    <div className="meal-card-macros mt-10">
-                        <h4 style={{fontSize: '1em', marginBottom: '5px', color: 'var(--color-text)'}}>Nutrition:</h4>
-                        <ul style={{listStyle: 'none', padding: 0, margin: 0, fontSize: '0.9em', color: 'var(--color-secondary-text)', display: 'flex', flexWrap: 'wrap', gap: '5px 10px'}}>
-                            {meal.calories && <li>Calories: {meal.calories}kcal</li>}
-                            {meal.protein && <li>Protein: {meal.protein}g</li>}
-                            {meal.carbs && <li>Carbs: {meal.carbs}g</li>}
-                            {meal.fat && <li>Fat: {meal.fat}g</li>}
-                        </ul>
-                    </div>
-                ) : null}
-                <div className="meal-card-actions">
-                  <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm">
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(meal.id)}
-                    className="btn btn-danger btn-sm">
-                    Delete
-                  </button>
-                </div>
+              </div>
+              <div className="meal-card-actions d-flex gap-10 justify-content-center mt-10" style={{ marginTop: 'auto' }}>
+                <Link to={`/meals/edit/${meal.id}`} className="btn btn-warning btn-sm" style={{ minWidth: 80 }}>Edit</Link>
+                <button
+                  onClick={() => handleDelete(meal.id)}
+                  className="btn btn-danger btn-sm"
+                  style={{ minWidth: 80 }}>
+                  Delete
+                </button>
               </div>
             </div>
           ))}
