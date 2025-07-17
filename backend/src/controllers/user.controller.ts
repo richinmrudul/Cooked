@@ -4,11 +4,9 @@ import { QueryResult } from 'pg';
 import bcrypt from 'bcryptjs';
 
 async function getUserStats(userId: string) {
-    // Updated to remove macro calculation fetches, focusing on core stats
     const totalMealsResult = await pool.query('SELECT COUNT(*) AS total FROM meals WHERE user_id = $1', [userId]);
     const avgRatingResult = await pool.query('SELECT AVG(overall_rating)::numeric(10,2) AS avg_rating FROM meals WHERE user_id = $1', [userId]);
     const rankedMealsResult = await pool.query(
-        // Fetches score, orders by score for top 5
         `SELECT
             r.score::numeric(10,2) AS score, m.id, m.title, m.description, m.photo_url, m.overall_rating, m.date_made
         FROM rankings r
@@ -18,6 +16,12 @@ async function getUserStats(userId: string) {
         LIMIT 5`,
         [userId]
     );
+    const userStreakResult = await pool.query(
+        'SELECT current_streak, longest_streak FROM users WHERE id = $1',
+        [userId]
+    );
+    const userStreakData = userStreakResult.rows[0] || { current_streak: 0, longest_streak: 0 };
+
 
     return {
         totalMeals: parseInt(totalMealsResult.rows[0]?.total || '0'),
@@ -27,6 +31,8 @@ async function getUserStats(userId: string) {
             score: parseFloat(row.score),
             rank_position: index + 1
         })),
+        currentStreak: userStreakData.current_streak,
+        longestStreak: userStreakData.longest_streak,
     };
 }
 
@@ -38,7 +44,7 @@ const getProfile = async (req: Request, res: Response) => {
 
     try {
         const userResult: QueryResult = await pool.query(
-            'SELECT id, first_name, last_name, email, created_at, profile_photo_url FROM users WHERE id = $1',
+            'SELECT id, first_name, last_name, email, created_at, profile_photo_url, current_streak, longest_streak, last_meal_date FROM users WHERE id = $1',
             [userId]
         );
         const user = userResult.rows[0];
@@ -49,6 +55,15 @@ const getProfile = async (req: Request, res: Response) => {
 
         const stats = await getUserStats(userId);
 
+        // NEW: Log streak values here
+        console.log(`User ${user.email} (ID: ${userId}) Profile Fetch:`);
+        console.log(`  current_streak from DB: ${user.current_streak}`);
+        console.log(`  longest_streak from DB: ${user.longest_streak}`);
+        console.log(`  last_meal_date from DB: ${user.last_meal_date}`);
+        console.log(`  currentStreak from stats: ${stats.currentStreak}`);
+        console.log(`  longestStreak from stats: ${stats.longestStreak}`);
+
+
         res.status(200).json({
             id: user.id,
             firstName: user.first_name,
@@ -56,7 +71,10 @@ const getProfile = async (req: Request, res: Response) => {
             email: user.email,
             createdAt: user.created_at,
             profilePhotoUrl: user.profile_photo_url,
-            stats
+            stats: {
+                ...stats,
+                lastMealDate: user.last_meal_date // Pass last_meal_date for potential frontend debugging if needed
+            }
         });
     } catch (error: unknown) {
         console.error('Error fetching user profile:', error);
@@ -70,14 +88,13 @@ const updateProfile = async (req: Request, res: Response) => {
         return res.status(401).json({ message: 'User not authenticated.' });
     }
 
-    // These come from req.body (parsed by express.json or multer if file upload is on)
     const { firstName, lastName, email, password, currentPassword, profilePhotoUrl, photo_url_is_null } = req.body;
 
     try {
         await pool.query('BEGIN');
 
         const userResult: QueryResult = await pool.query(
-            'SELECT password_hash FROM users WHERE id = $1',
+            'SELECT password_hash, profile_photo_url FROM users WHERE id = $1',
             [userId]
         );
         const user = userResult.rows[0];
@@ -96,9 +113,13 @@ const updateProfile = async (req: Request, res: Response) => {
             newPasswordHash = await bcrypt.hash(password, 10);
         }
 
-        let newProfilePhotoUrl: string | null = profilePhotoUrl; // Assumed to be URL from frontend
-        if (photo_url_is_null === true || photo_url_is_null === 'true') { // Handle boolean or string 'true'
+        let newProfilePhotoUrl: string | null = user.profile_photo_url;
+        if (profilePhotoUrl) { // Assuming profilePhotoUrl is sent directly from frontend if it's a URL input
+            newProfilePhotoUrl = profilePhotoUrl;
+        } else if (photo_url_is_null === 'true') { // Flag sent from frontend to explicitly clear photo
             newProfilePhotoUrl = null;
+        } else if (req.file) { // If profilePhoto is sent as a file
+            newProfilePhotoUrl = `http://localhost:${process.env.PORT || 5000}/uploads/${req.file.filename}`;
         }
 
         const updateResult: QueryResult = await pool.query(

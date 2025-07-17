@@ -25,7 +25,7 @@ interface Meal {
 const createMeal = async (req: Request, res: Response) => {
   const { title, description, date_made, overall_rating, tags, ingredients } = req.body;
   const userId = req.user?.id;
-  const photoFile = req.file; // NEW: Get uploaded file from req.file
+  const photoFile = req.file;
 
   let parsedTags: string[] = [];
   if (typeof tags === 'string' && tags.trim() !== '') {
@@ -37,20 +37,65 @@ const createMeal = async (req: Request, res: Response) => {
       try { parsedIngredients = JSON.parse(ingredients); } catch (e) { console.error("Failed to parse ingredients JSON string:", ingredients, e); return res.status(400).json({ message: "Invalid ingredients format." }); }
   }
 
-  // Determine photo_url: use uploaded file path or default to null
   let photo_url_to_save: string | null = null;
-  if (photoFile) {
-    photo_url_to_save = `http://localhost:${process.env.PORT || 5000}/uploads/${photoFile.filename}`;
-  }
+  if (photoFile) { photo_url_to_save = `http://localhost:${process.env.PORT || 5000}/uploads/${photoFile.filename}`; }
 
   if (!userId) { return res.status(401).json({ message: 'User not authenticated.' }); }
   if (!title || !date_made || overall_rating === undefined) { return res.status(400).json({ message: 'Title, date_made, and overall_rating are required.' }); }
   if (overall_rating < 1 || overall_rating > 5) { return res.status(400).json({ message: 'Overall rating must be between 1 and 5.' }); }
 
   try {
-    await pool.query('BEGIN');
+    await pool.query('BEGIN'); // Start transaction
 
-    // Removed macros from INSERT query here
+    
+    // Get user's current streak data from the database
+    const userStreakResult: QueryResult = await pool.query(
+        'SELECT current_streak, longest_streak, last_meal_date FROM users WHERE id = $1 FOR UPDATE',
+        [userId]
+    );
+    const userData = userStreakResult.rows[0];
+    let { current_streak, longest_streak, last_meal_date } = userData || { current_streak: 0, longest_streak: 0, last_meal_date: null };
+
+    const currentServerDateUTC = new Date(); // Get the current server date/time
+    currentServerDateUTC.setUTCHours(0, 0, 0, 0); // Normalize to start of day UTC
+
+    let newCurrentStreak = current_streak;
+    let newLongestStreak = longest_streak;
+    let newLastMealDate = currentServerDateUTC; // Update last_meal_date to the current server date
+
+    if (last_meal_date) {
+        const lastMealDateObj = new Date(last_meal_date);
+        lastMealDateObj.setUTCHours(0, 0, 0, 0);
+
+        // Calculate difference in days between current server date and last logged meal date
+        const diffTime = currentServerDateUTC.getTime() - lastMealDateObj.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) { // Cooked yesterday (based on server time), streak continues
+            newCurrentStreak++;
+        } else if (diffDays === 0) { // Cooked already today (multiple meals on same day), streak doesn't change
+            // newCurrentStreak remains the same
+            
+        } else { // Gap of more than 1 day, or logging a meal for a past date relative to last_meal_date, reset streak
+            newCurrentStreak = 1; // Start a new streak
+        }
+    } else {
+        // First meal ever
+        newCurrentStreak = 1;
+    }
+
+    if (newCurrentStreak > newLongestStreak) {
+        newLongestStreak = newCurrentStreak;
+    }
+
+    // Update user's streak data in the users table
+    await pool.query(
+        'UPDATE users SET current_streak = $1, longest_streak = $2, last_meal_date = $3 WHERE id = $4',
+        [newCurrentStreak, newLongestStreak, newLastMealDate, userId]
+    );
+    // NEW STREAK LOGIC ENDS HERE
+
+
     const mealResult: QueryResult = await pool.query(
       `INSERT INTO meals (user_id, title, description, date_made, photo_url, overall_rating)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_id, title, description, date_made, photo_url, overall_rating, created_at`,
@@ -68,7 +113,6 @@ const createMeal = async (req: Request, res: Response) => {
     if (parsedIngredients && parsedIngredients.length > 0) {
       for (const ingredient of parsedIngredients as IngredientInput[]) {
         let ingId;
-        // FIX: Robustly get ingredient ID (SELECT then INSERT if not exists)
         const existingIngResult: QueryResult = await pool.query(
           'SELECT id FROM ingredients WHERE name = $1',
           [ingredient.name]
@@ -90,10 +134,10 @@ const createMeal = async (req: Request, res: Response) => {
       }
     }
 
-    await pool.query('COMMIT');
+    await pool.query('COMMIT'); // Commit transaction
     res.status(201).json({ message: 'Meal created successfully', meal: { ...newMeal, tags: parsedTags, ingredients: parsedIngredients } });
   } catch (error: unknown) {
-    await pool.query('ROLLBACK');
+    await pool.query('ROLLBACK'); // Rollback on error
     console.error('Error creating meal:', error);
     res.status(500).json({ message: 'Server error creating meal.' });
   }

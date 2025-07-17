@@ -3,6 +3,7 @@ import { useApiClient } from '../api/apiClient';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 
+// Updated UserProfile interface to include streak data
 interface UserProfile {
   id: string;
   firstName: string;
@@ -13,6 +14,8 @@ interface UserProfile {
   stats: {
     totalMeals: number;
     averageRating: number;
+    currentStreak: number; // NEW: current streak
+    longestStreak: number; // NEW: longest streak
     topRankedMeals: Array<{
       id: string;
       title: string;
@@ -23,6 +26,7 @@ interface UserProfile {
       score: number;
     }>;
   };
+  lastMealDate?: string | null; // NEW: last meal date
 }
 
 const ProfilePage: React.FC = () => {
@@ -43,10 +47,10 @@ const ProfilePage: React.FC = () => {
     password: '',
     currentPassword: '',
   });
-  //  States for profile photo file upload
-  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null); // State for the selected file
-  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null); // State for current/new photo URL for preview
-  const [clearProfilePhoto, setClearProfilePhoto] = useState(false); // State to explicitly clear photo
+  // Correct states for profile photo file upload
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null);
+  const [clearProfilePhoto, setClearProfilePhoto] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -69,7 +73,7 @@ const ProfilePage: React.FC = () => {
           password: '',
           currentPassword: '',
         });
-        setProfilePhotoPreview(data.profilePhotoUrl || null); // Set initial preview URL from fetched data
+        setProfilePhotoPreview(data.profilePhotoUrl || null); // Set initial preview URL
         setClearProfilePhoto(false); // Reset clear flag on fetch
       } catch (err: any) {
         setError(err.message || 'Failed to fetch profile.');
@@ -87,29 +91,26 @@ const ProfilePage: React.FC = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle file selection for profile photo
   const handleProfilePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setProfilePhotoFile(file);
-      setProfilePhotoPreview(URL.createObjectURL(file)); // Show URL of new file as preview
-      setClearProfilePhoto(false); // If new file selected, don't clear
+      setProfilePhotoPreview(URL.createObjectURL(file));
+      setClearProfilePhoto(false);
     } else {
       setProfilePhotoFile(null);
-      // Only clear preview if no new file selected AND we're not explicitly clearing existing
       if (!clearProfilePhoto) {
         setProfilePhotoPreview(null);
       }
     }
   };
 
-  //  Handle clearing profile photo
   const handleClearProfilePhoto = () => {
-    setProfilePhotoFile(null); // Clear any newly selected file
-    setProfilePhotoPreview(null); // Clear the preview
-    setClearProfilePhoto(true); // Set flag to tell backend to clear existing photo
+    setProfilePhotoFile(null);
+    setProfilePhotoPreview(null);
+    setClearProfilePhoto(true);
     const photoInput = document.getElementById('profile-photo-upload') as HTMLInputElement;
-    if (photoInput) photoInput.value = ''; // Clear file input field
+    if (photoInput) photoInput.value = '';
   };
 
 
@@ -118,7 +119,6 @@ const ProfilePage: React.FC = () => {
     setSubmitting(true);
     setUpdateError(null);
 
-    // Prepare FormData for submission (required for file uploads)
     const formToSend = new FormData();
     formToSend.append('firstName', formData.firstName);
     formToSend.append('lastName', formData.lastName);
@@ -128,16 +128,13 @@ const ProfilePage: React.FC = () => {
       formToSend.append('currentPassword', formData.currentPassword);
     }
 
-    // Handle profile photo file or clear flag
     if (profilePhotoFile) {
-      formToSend.append('profilePhoto', profilePhotoFile); // 'profilePhoto' matches backend upload.single
+      formToSend.append('profilePhoto', profilePhotoFile);
     } else if (clearProfilePhoto) {
-      formToSend.append('photo_url_is_null', 'true'); // Send flag to backend
+      formToSend.append('photo_url_is_null', 'true');
     }
-    // If neither, backend will retain existing profilePhotoUrl
 
     try {
-      // Use FormData for body
       const response = await authFetch('/user/profile', {
         method: 'PUT',
         body: formToSend,
@@ -213,6 +210,15 @@ const ProfilePage: React.FC = () => {
                     <p className="stat-label">Average Rating:</p>
                     <p className="stat-value">{profile.stats.averageRating ? profile.stats.averageRating.toFixed(2) : 'N/A'}</p>
                 </div>
+                {/*Display Current and Longest Streak */}
+                <div className="stat-card">
+                    <p className="stat-label">Current Streak:</p>
+                    <p className="stat-value">{profile.stats.currentStreak} days</p>
+                </div>
+                <div className="stat-card">
+                    <p className="stat-label">Longest Streak:</p>
+                    <p className="stat-value">{profile.stats.longestStreak} days</p>
+                </div>
             </div>
 
             <h3 className="mb-15">Your Top 5 Meals</h3>
@@ -263,7 +269,7 @@ const ProfilePage: React.FC = () => {
                         <input type="password" id="currentPassword" name="currentPassword" value={formData.currentPassword} onChange={handleFormChange} required />
                     </div>
                 )}
-                {/* Replaced Photo URL with File Upload */}
+                {/* Profile Photo File Upload Input */}
                 <div className="form-group">
                     <label htmlFor="profile-photo-upload">Profile Photo:</label>
                     <input type="file" id="profile-photo-upload" name="profilePhoto" accept="image/*" onChange={handleProfilePhotoChange} />
