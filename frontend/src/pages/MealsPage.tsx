@@ -21,7 +21,7 @@ interface Meal {
 
 const MealsPage: React.FC = () => {
   const { authFetch } = useApiClient();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
